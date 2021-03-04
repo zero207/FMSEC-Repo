@@ -1,0 +1,228 @@
+theory NSLPK3conformingclass
+begin
+
+builtins: asymmetric-encryption
+
+/*
+   Protocol:    The classic three message version of the
+                Needham-Schroeder-Lowe Public Key Protocol
+                Now conforming to the requirements given in class
+   Modeler:     Simon Meier, adjusted for class requirements by Ralf Sasse
+   Date:        June 2012, March 2017
+   Source:      Modeled after the description by Paulson in
+                Isabelle/HOL/Auth/NS_Public.thy.
+
+   Status:      working
+
+   Note that we are using explicit global constants for discerning the
+   different encryption instead of the implicit sources.
+ */
+
+/* We formalize the following protocol
+
+  protocol NSLPK3 {
+    1. I -> R: {'1',ni,I}pk(R)
+    2. I <- R: {'2',ni,nr,R}pk(I)
+    3. I -> R: {'3',nr}pk(R)
+  }
+*/
+
+
+
+/* Information for the FMSec course:
+
+You may ignore the [sources] lemma called "types", as well as all the
+annotation (action facts) necessary for it: 
+OUT_I_1, OUT_R_1, IN_R_1_ni, IN_I_2_nr
+
+For the lemma "injective_agree" wait until week 4's lecture, and
+ignore the related action facts for now:
+Claim_commit, Claim_running
+*/
+
+// Infrastructure rules
+rule Register_pk:
+  [ Fr(~ltkA) ]
+  -->
+  [ !Ltk($A, ~ltkA), !Pk($A, pk(~ltkA)), Out(pk(~ltkA)) ]
+
+rule Reveal_ltk:
+  [ !Ltk(A, ltkA) ] --[ Rev(A)    ]-> [ Out(ltkA) ]
+
+// Initialization rules
+rule initialize_I:
+    [ Fr(~id) 
+    , !Ltk(I,skI)
+    , !Pk(R,pkR) ]
+  --[ Create(I,~id,'RoleInitiator') ]->
+    [ St_I_0(I,~id,R,skI,pkR) ]
+
+rule initialize_R:
+    [ Fr(~id) 
+    , !Ltk(R,skR)
+    , !Pk(I,pkI) ]
+  --[ Create(R,~id,'RoleResponder') ]->
+    [ St_R_0(R,~id,I,skR,pkI) ]
+
+// Protocol rules
+rule I_1send:
+  let m1 = aenc{'1', ~ni, I}pkR
+  in
+    [ Fr(~ni)
+    , St_I_0(I,id,R,skI,pkR)
+    ]
+  --[ OUT_I_1(m1)
+    , Send(I,m1)
+    ]->
+    [ Out( m1 )
+    , St_I_1(I,id,R,skI,pkR,~ni)
+    ]
+
+rule R_1recv:
+  let m1 = aenc{'1', ni, I}pk(skR)
+  in
+    [ St_R_0(R,id,I,skR,pkI)
+    , In( m1 )
+    ]
+  --[ IN_R_1_ni( ni, m1 )
+    , Recv(R,m1)
+    ]->
+    [ St_R_1(R,id,I,skR,pkI,ni)
+    ]
+
+rule R_2send:
+  let m2 = aenc{'2', ni, ~nr, R}pkI
+  in
+    [ St_R_1(R,id,I,skR,pkI,ni)
+    , Fr(~nr)
+    ]
+  --[ Send(R,m2)
+    , Claim_running(I, R, <'init',ni,~nr>)
+    , OUT_R_1( m2 )
+    ]->
+    [ Out( m2 )
+    , St_R_2(R,id,I,skR,pkI,ni,~nr) ]
+
+rule I_2recv:
+  let m2 = aenc{'2', ni, nr, R}pk(skI)
+  in
+    [ St_I_1(I,id,R,skI,pkR,ni)
+    , In( m2 )
+    ]
+  --[ IN_I_2_nr( nr, m2)
+    , Claim_commit (I, R, <'init',ni,nr>)  // need to log identities explicitly to
+    , Claim_running(R, I, <'resp',ni,nr>)  // specify that they must not be
+                                           // compromised in the property.
+    , Recv(I,m2)
+    , Claim_secret(I,ni)
+    , Claim_secret(I,nr)
+    , Honest(I)
+    , Honest(R)
+    ]->
+    [ St_I_2(I,id,R,skI,pkR,ni,nr)
+    ]
+
+
+rule I_3send:
+  let m3 = aenc{'3', nr}pkR
+  in
+    [ St_I_2(I,id,R,skI,pkR,ni,nr)
+    ]
+  --[ Send(I, m3) ]->
+    [ St_I_3(I,id,R,skI,pkR,ni,nr)
+    , Out( m3 ) ]
+
+
+rule R_3recv:
+  let m3 = aenc{'3', nr}pk(skR) 
+  in
+    [ St_R_2(R,id,I,skR,pkI,ni,nr)
+    , In( m3 )
+    ]
+  --[ Recv(R,m3)
+    , Claim_commit (R, I, <'resp',ni,nr>)
+    , Claim_secret(R,ni)
+    , Claim_secret(R,nr)
+    , Honest(R)
+    , Honest(I)
+    ]->
+    [ St_R_3(R,id,I,skR,pkI,ni,nr)
+    ]
+
+
+/* Note for the FMSec course: You do not have to understand the issues
+surrounding the sources lemma described here, and can just skip
+it. For termination reasons it cannot be removed though.
+
+General: Note that we are using an untyped protocol model.
+The contents of the 'ni' variable in rule R_1 may therefore in general be any
+message. This leads to unsolved chain constraints when checking what message
+can be extracted from the message sent by rule R_1. In order to get rid of
+these constraints, we require the following sources invariant that relates the
+point of instantiation to the point of sending by either the adversary or the
+initiator.
+
+In order to understand the use of this sources invariant you might try the
+follwing experiment. Comment out this sources invariant and then check the
+precomputed case distinctions in the GUI. Try to complete the proof of the
+'nonce_secrecy' lemma.
+*/
+lemma types [sources]:
+  " (All ni m1 #i.
+       IN_R_1_ni( ni, m1) @ i
+       ==>
+       ( (Ex #j. KU(ni) @ j & j < i)
+       | (Ex #j. OUT_I_1( m1 ) @ j)
+       )
+    )
+  & (All nr m2 #i.
+       IN_I_2_nr( nr, m2) @ i
+       ==>
+       ( (Ex #j. KU(nr) @ j & j < i)
+       | (Ex #j. OUT_R_1( m2 ) @ j)
+       )
+    )
+  "
+
+// Nonce secrecy from the perspective of either the initiator or the responder.
+lemma nonces_secrecy:
+ " /* If someone claims to have setup a secret, */
+   All A M #i. Claim_secret(A, M)@i
+      ==> 
+         /* the adversary cannot know the secret */
+       ( not (Ex #j. K(M)@j)
+         /* without having performed a key reveal of someone required to be honest */
+       | (Ex B #k. Rev(B)@k & Honest(B)@i)
+       )"
+
+// FMSec course: you will learn about the injective agreement in week 4's lecture only, so ignore until then.
+// Injective agreement from the perspective of both the initiator and the responder.
+lemma injective_agree:
+  " /* Whenever somebody commits to running a session, then*/
+    All actor peer params #i.
+        Claim_commit(actor, peer, params) @ i
+      ==>
+        /* there is somebody running a session with the same parameters */
+          (Ex #j. Claim_running(actor, peer, params) @ j & j < i
+            /* and there is no other commit on the same parameters */
+            & not(Ex actor2 peer2 #i2.
+                    Claim_commit(actor2, peer2, params) @ i2 & not(#i = #i2)
+                 )
+          )
+        /* or the adversary perform a long-term key reveal on actor or peer */
+        | (Ex #r. Rev(actor) @ r)
+        | (Ex #r. Rev(peer)  @ r)
+  "
+
+// Consistency check: ensure that secrets can be shared between honest agents.
+lemma session_key_setup_possible:
+  exists-trace
+  " /* It is possible that */
+    Ex A B s #i #j.
+      /* a pair of agents claims to have setup a shared secret, */
+      Claim_secret(A, s) @ i & Claim_secret(B,s) @j & (not A = B)
+      /* without the adversary having performed any long-term key reveal. */
+    & not (Ex X #r. Rev(X) @ r)
+  "
+
+end
