@@ -14,7 +14,7 @@ generated key is secret provided that the server is uncompromised.
 We model this protocol in three steps. First, we declare the function symbols
 and the equations defining them. Then, we introduce multiset rewriting rules
 modeling a public key infrastructure (PKI) and the protocol. Finally, we state
-the expected security properties.TesTets
+the expected security properties.TesTetsdada
 
 
 Function Signature and Equational Theory
