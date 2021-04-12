@@ -12,6 +12,17 @@ rule Generate_shared_Key:
   -->
   [ !Ltk($A, $B, ~shared_kAB) ]
 
+// necessary for the proofing lemmas
+rule Reveal_ltk_A:
+  [ !Ltk(A, B, shared_kAB) ]
+  --[ Rev(A), Rev(B) ]->
+  [ Out(shared_kAB) ]
+//necessary for the proofing lemmas
+rule Reveal_ltk_B:
+  [ !Ltk(A, B, shared_kAB) ]
+  --[ Rev(B) ]->
+  [ Out(shared_kAB) ]
+
 // Protocol
 
 //Initialize initiator A   
