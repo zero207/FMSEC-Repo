@@ -27,37 +27,39 @@ rule Reveal_ltk_B:
 
 //Initialize initiator A   
 rule Init_A:
-  [ !Ltk(A, B, shared_kAB) ]
+  [Fr(~id) 
+  ,!Ltk(A, B, shared_kAB) ]
   --[ INIT_A(A, B, shared_kAB) ]->
-  [ St_A_0(A, B, shared_kAB) ]
+  [ St_A_0(A, B, ~id, shared_kAB) ]
 
 //Initialize  responder B
 rule Init_B:
-  [ !Ltk(A, B, shared_kAB) ]
+  [Fr(~id) 
+  ,!Ltk(A, B, shared_kAB) ]
   --[ INIT_B(B, A, shared_kAB) ]->
-  [ St_B_0(B, A, shared_kAB) ]
+  [ St_B_0(B, A, ~id, shared_kAB) ]
 
 //A sends nonce x
 rule A_0:
   [ Fr(~x)
-  , St_A_0(A, B, shared_kAB) ]
+  , St_A_0(A, B, ~id, shared_kAB) ]
   --[ OUT_A_0(A, B, ~x) ]->
   [ Out(~x)
-  , St_A_1(A, B, ~x, shared_kAB) ]
+  , St_A_1(A, B, ~id, ~x, shared_kAB) ]
 
 //B receives nonce x
 rule B_0:
-  [ St_B_0(B, A, shared_kAB)
+  [ St_B_0(B, A, ~id, shared_kAB)
   , In(x) ]
   --[ IN_B_0(B, A, x)
     , Running(B, A, <'I','R',x>)
     , Honest(A) ]->
-  [ St_B_1(B, A, x, shared_kAB) ]
+  [ St_B_1(B, A, ~id, x, shared_kAB) ]
 
 //B sends message m (MAC of x)
 rule B_1:
   let m = mac(x, shared_kAB) in
-  [ St_B_1(B, A, x, shared_kAB) ]
+  [ St_B_1(B, A, ~id, x, shared_kAB) ]
   --[ OUT_B_1(B, A, m) ]->
   [ Out(m) ]
 
@@ -65,7 +67,7 @@ rule B_1:
 rule A_1:
   let m = mac(x, shared_kAB) in
   [ In(m)
-  , St_A_1(A, B, x, shared_kAB) ]
+  , St_A_1(A, B, ~id, x, shared_kAB) ]
   --[ IN_A_1(A, B, m)
     , Commit(A, B, <'I','R',x>)
     , Honest(B) ]->
@@ -73,7 +75,7 @@ rule A_1:
 
 // Lemmas
 
-// succeeds
+// it's executable
 lemma executable:
   exists-trace
     "Ex A B m #i.
@@ -81,7 +83,7 @@ lemma executable:
        & not (A = B)
        & not (Ex #k. Rev(A)@k) & not (Ex #k. Rev(B)@k)"
 
-// succeeds
+// satisfies authentication property that A injectively agrees with B on the nonce x
 lemma injectiveAgreement:
   "All a b t #i. 
     Commit(a,b,<'I','R',t>) @i
