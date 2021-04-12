@@ -5,7 +5,6 @@ A -> B: x
 B -> A: [x]_k(a,b)
 */
 begin
-builtins symmetric encryption
 functions: mac/2
 
 rule Generate_shared_Key:
@@ -16,16 +15,16 @@ rule Generate_shared_Key:
 // Protocol
 
 //Initialize initiator A   
-rule Initialize_A:
+rule Init_A:
   [ !Ltk(A, B, shared_kAB) ]
   --[ INIT_A(A, B, shared_kAB) ]->
-  [ St_A_1(A, B, shared_kAB) ]
+  [ St_A_0(A, B, shared_kAB) ]
 
 //Initialize  responder B
-rule Initialize_B:
+rule Init_B:
   [ !Ltk(A, B, shared_kAB) ]
   --[ INIT_B(B, A, shared_kAB) ]->
-  [ St_B_1(B, A, shared_kAB) ]
+  [ St_B_0(B, A, shared_kAB) ]
 
 //A sends nonce x
 rule A_0:
@@ -67,7 +66,7 @@ rule A_1:
 lemma executable:
   exists-trace
     "Ex A B m #i.
-       IN_A_2(A, B, m)@i
+       IN_A_1(A, B, m)@i
        & not (A = B)
        & not (Ex #k. Rev(A)@k) & not (Ex #k. Rev(B)@k)"
 
