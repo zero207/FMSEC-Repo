@@ -1,7 +1,9 @@
-theory P1
+theory P2a
 /*
 The following MAC-based challenge response protocol has to be  defined
 A -> B: x
+B -> A: y
+A -> B: [y]_k(b,a)
 B -> A: [x]_k(a,b)
 */
 begin
@@ -15,7 +17,7 @@ rule Generate_shared_Key:
 // necessary for the proofing lemmas
 rule Reveal_ltk_A:
   [ !Ltk(A, B, shared_kAB) ]
-  --[ Rev(A) ]->
+  --[ Rev(A)]->
   [ Out(shared_kAB) ]
 
 // necessary for the proofing lemmas
@@ -47,6 +49,30 @@ rule A_0:
   --[ OUT_A_0(A, B, ~x) ]->
   [ Out(~x)
   , St_A_1(A, B, ~id, ~x, shared_kAB) ]
+
+// A receives nonce y
+rule A_1:
+  [  ]
+  --[
+    
+  ]->
+  [  ]
+
+// A sends mac(y)_k(a,b)
+ rule A_2:
+   [  ]
+   --[
+     
+   ]->
+   [  ] 
+
+// A receives mac(x)_k(a,b)
+rule A_3:
+  [  ]
+  --[
+    
+  ]->
+  [  ]
 
 // B receives nonce x
 rule B_0:
