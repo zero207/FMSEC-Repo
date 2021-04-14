@@ -1,13 +1,14 @@
-theory P2b
+theory P3a
 /*
 The following MAC-based challenge response protocol has to be  defined
 A -> B: x
 B -> A: y
-A -> B: ['I',y,x]_k(b,a)
+A -> B: ['I',y]_k(a,b)
 B -> A: ['R',x]_k(a,b)
 */
 begin
-functions: mac/2
+
+functions: mac/2, kdf/3
 
 rule Generate_shared_Key:
   [ Fr(~shared_kAB) ]
@@ -60,20 +61,27 @@ rule A_1:
   , Honest(B) ]->
   [ St_A_2(A, B, ~id, x, y, shared_kAB) ]
 
-// A sends mac of y bounded with nonce x and identity 'I'
+// A sends mac of y with session key Kab and identity 'I'
  rule A_2:
-    let my = mac(<'I', y, x>, shared_kAB)  in
+    let 
+      Kab = kdf(shared_kAB, x,y)
+      my = mac(Kab,y)  
+    in
    [ St_A_2(A, B, ~id, x, y, shared_kAB) ]
    --[OUT_A_2(A, B, my) ]->
    [Out(my)
    ,St_A_3(A, B, ~id, x, y, shared_kAB)  ] 
 
-// A receives mac of x bounded with R
+// A receives mac of x bounded with R and session key Kab
 rule A_3:
-  let mx = mac(<x,'R'>, shared_kAB) in
+  let 
+    Kab = kdf(shared_kAB,x,y)
+    mx = mac(<'R',x>, Kab) 
+  in
   [ In(mx)
   , St_A_3(A, B, ~id, x, y, shared_kAB) ]
   --[ IN_A_3(A, B, mx)
+    , Secret(A,Kab)
     , DONE(A, B, x, y, shared_kAB)
     , Commit(A, B, <'I','R',x,y>)
     , Honest(A)
@@ -98,10 +106,11 @@ rule B_1:
   ]->
   [ St_B_2(B, A, ~id, x, ~y, shared_kAB) ]
 
-// B receives MAC of y bounded with x and I
+// B receives MAC of y bounded with session key Kab and I
 rule B_2:
   let
-    my = mac(<'I',y ,x>,shared_kAB)
+    Kab = kdf(shared_kAB,x,y)
+    my = mac(<'I',y ,x>,Kab)
   in
   [ St_B_2(B, A, ~id, x, y, shared_kAB)
   ,In(my) ]
@@ -112,10 +121,11 @@ rule B_2:
   ]->
   [ St_B_3(B, A, ~id, x, y, shared_kAB) ]
 
-// B sends message mx (MAC of x bounded with R)
+// B sends MAC mx bounded with R using session key Kab
 rule B_3:
   let 
-    mx = mac(<'R',x>, shared_kAB) 
+    Kab = kdf(shared_kAB,x,y)
+    mx = mac(<'R',x>, Kab) 
   in
   [ St_B_3(B, A, ~id, x, y, shared_kAB) ]
   --[ OUT_B_1(B, A, mx) ]->
@@ -151,4 +161,10 @@ lemma injectiveAgreement_R:
         & not (Ex a2 b2 #i2. Commit(a2,b2,<'R','I',t>) @i2
                            & not (#i2 = #i)))
               | (Ex X #r. Rev(X)@r & Honest(X) @i)"
+// prove secrecy of Kab
+lemma secrecy:
+  "All A x #i. 
+    Secret(A,x) @i ==> 
+    not (Ex #j. K(x)@j)
+        | (Ex X #r. Rev(X)@r & Honest(X) @i)"
 end
