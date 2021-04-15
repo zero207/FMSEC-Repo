@@ -53,8 +53,9 @@ rule B_0:
   [ St_B_0(B, A, ~id, shared_kAB)
   , In(x) ]
   --[ IN_B_0(B, A, x)
-    , Running(B, A, <'I','R',x>)
-    , Honest(A) ]->
+    , Running(B, A, <'A','B',x>)
+    , Honest(A)
+    , Honest(B) ]->
   [ St_B_1(B, A, ~id, x, shared_kAB) ]
 
 // B sends message m (MAC of x)
@@ -70,7 +71,8 @@ rule A_1:
   [ In(m)
   , St_A_1(A, B, ~id, x, shared_kAB) ]
   --[ IN_A_1(A, B, m)
-    , Commit(A, B, <'I','R',x>)
+    , Commit(A, B, <'A','B',x>)
+    , Honest(A)
     , Honest(B) ]->
   []
 
@@ -87,8 +89,8 @@ lemma executable:
 // satisfies authentication property that A injectively agrees with B on the nonce x
 lemma injectiveAgreement:
   "All a b t #i. 
-    Commit(a,b,<'I','R',t>) @i
-    ==> (Ex #j. Running(b,a,<'I','R',t>) @j 
+    Commit(a,b,<'A','B',t>) @i
+    ==> (Ex #j. Running(b,a,<'A','B',t>) @j 
         & not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>) @i2
                            & not (#i2 = #i)))
               | (Ex X #r. Rev(X)@r & Honest(X) @i)"
