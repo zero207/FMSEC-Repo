@@ -1,0 +1,102 @@
+theory PACE_1
+begin
+
+functions: mac/2
+
+/*
+1. A -> B: x
+2. B -> A: [x]k(A,B)
+*/
+
+// Shared key infrastructure rules
+
+rule Register_shared_kAB:
+    [ Fr(~kAB) ]
+    -->
+    [ !LtMac($A, $B, ~kAB) ]
+
+rule Reveal_shk_A:
+    [ !LtMac(A, B, kAB) ]
+    --[ Rev(A) ]->
+    [ Out(kAB) ]
+
+rule Reveal_shk_B:
+    [ !LtMac(A, B, kAB) ]
+    --[ Rev(B) ]->
+    [ Out(kAB) ]
+
+// Initialisation rules
+
+//Initialise A
+rule Initialise_A:
+    [ Fr(~id), !LtMac(A, B, kAB) ]
+    --[ Create_A(A, ~id, 'roleA') ]->
+    [ St_A_1(A, ~id, B, kAB) ]
+
+//Initialise B
+rule Initialise_B:
+    [ Fr(~id), !LtMac(A, B, kAB) ]
+    --[ Create_B(B, ~id, 'roleB') ]->
+    [ St_B_1(B, ~id, A, kAB) ]
+
+// Protocol rules
+
+//A sends message x
+rule A_send:
+    [ Fr(~x)
+    , St_A_1(A, id, B, kAB) ]
+    --[ Send(A, B, ~x) ]->
+    [ St_A_2(A, id, B, ~x, kAB)
+    , Out(~x) ]
+
+//B receives message x
+rule B_receive:
+    [ St_B_1(B, id, A, kAB)
+    , In(x) ]
+    --[ Recv(B, A, x)
+    ]->
+    [ St_B_2(B, id, A, x, kAB) ]
+
+//B sends message m (MAC of x)
+rule B_send:
+    let m = mac(kAB, x) in
+    [ St_B_2(B, id, A, x, kAB) ]
+    --[ Send(B, A,  m)
+    , Running(B, A, <'A','B', m>)
+    , Honest(A)
+    , Honest(B) ]->
+    [ St_B_3(B, id, A, x, kAB), Out(m) ]
+
+//A receives message m (MAC of x)
+rule A_receive:
+    let m = mac(kAB, x) in
+    [ St_A_2(A, id, B, x, kAB)
+    , In(m) ]
+    --[ Recv(A, B,  m)
+      , Commit(A, B, <'A','B', m>)
+      , Honest(A)
+      , Honest(B) ]->
+    [St_A_3(A, id, B, x, kAB)]
+
+// Lemmas
+
+// succeeds
+lemma executable:
+  exists-trace
+    "Ex A B m #i.
+       Recv(A, B, m)@i
+       & not (A = B)
+       & not (Ex #k. Rev(A)@k) & not (Ex #k. Rev(B)@k)
+    "
+
+// succeeds
+lemma injectiveAgreement:
+  "All a b t #i.
+    Commit(a,b,<'A','B',t>) @i
+    ==> (Ex #j. Running(b,a,<'A','B',t>) @j
+        & not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>) @i2
+                           & not (#i2 = #i)))
+              | (Ex X #r. Rev(X)@r & Honest(X)@i)
+  "
+
+end
