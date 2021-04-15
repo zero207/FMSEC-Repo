@@ -33,6 +33,10 @@
 \usepackage{parcolumns}
 \usepackage[toc,page]{appendix}
 \usepackage{enumitem}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{enumerate}
+\usepackage{xcolor}
 
 \ifsolution\includecomment{final}
 \else\excludecomment{final}\fi
@@ -61,9 +65,31 @@
 
 \section{PACE protocol}
 \subsection{A simple challenge-response protocol}
+The following simple challenge-response protocol was formalized in Tamarin:
+\begin{align*}
+  A \rightarrow B: x\\
+  B \rightarrow A: [x]_{k(a,b)}
+\end{align*}
+The MAC function was realised by an user-defined function with two parameters in Tamarin.  The details can be found in file \textbf{P1.spthy}. 
 \subsection{Mutual authentication}
+The challenge-response protocol is extended in this subtask in that now it is not just Alice who sends a nonce x to Bob.  Bob now also generates and sends a nonce y,  which is sent to A. The goal of the protocol is to reach an agreement between the two roles A and B with both nonces. Formally, the protocol now looks like this:
+\begin{align*}
+A \rightarrow B: x\\
+B \rightarrow: y\\
+A \rightarrow B: [y]_{k(b,a)}\\
+B \rightarrow A: [x]_{k(a,b}
+\end{align*}
+Further details can be taken from the file \textbf{P2a.spthy}.
 \begin{enumerate}[label=\alph*)]
-	\item It's not secure against a replay attack. We have to add the identity of the corresponding role to ensure injective agreement.
+	\item If we assume that there can be a network attacker who can eavesdrop on all the information exchanged.  So we can assume that this protocol is vulnerable to \textit{
+	replay attacks}. Since neither Alice nor Bob include any information in their messages to authenticate the message, it can be intercepted by an eavesdropper and resent later.
+	An attack scenario could look like following:
+	\begin{align*}
+	A \rightarrow A'_{eaves}: x\\
+	A'_{eaves} \rightarrow B: x'\\
+	B \rightarrow A : y\\
+	A \rightarrow B : [y]_{k(a,b)}
+	\end{align*}
 	\item Fix the property
 \end{enumerate}
 \subsection{Introducing a session key}
