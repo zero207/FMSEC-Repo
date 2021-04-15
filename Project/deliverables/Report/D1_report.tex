@@ -1,0 +1,87 @@
+% IMPORTANT: add or remove (comment out) the boolean '\solutiontrue' below to
+% create the solution document or the exercise document respectively.
+% First we create the switch to make either the exercises or the solutions
+\newif\ifsolution\solutionfalse
+% To create the solution uncomment '\solutiontrue'
+\solutiontrue
+
+\documentclass[a4paper,11pt]{scrartcl}
+
+\title{Formal Methods for Information Security}
+
+\author{Mathias Woringer \\ \href{mailto:mworinger@student.ethz.ch} {mworinger@student.ethz.ch}
+\and Gian-Luca Piras \\ \href{mailto:gpiras@student.ethz.ch}{gpiras@student.ethz.ch}}
+
+\ifsolution
+\subtitle{\textbf{Project report}}
+\fi
+
+\usepackage[T1]{fontenc}
+\usepackage{ae, aecompl}
+\usepackage{a4wide}
+\usepackage{boxedminipage}
+\usepackage{graphicx}
+\usepackage{subfigure}
+\usepackage{enumerate}
+\usepackage{url}
+\usepackage{listings}
+\usepackage{comment}
+\usepackage{bibentry}
+\usepackage{hyperref}
+\usepackage{underscore}
+\usepackage{listings}
+\usepackage{parcolumns}
+\usepackage[toc,page]{appendix}
+\usepackage{enumitem}
+
+\ifsolution\includecomment{final}
+\else\excludecomment{final}\fi
+
+% ------------ Listings Settings
+\lstset{%
+  basicstyle=\small\ttfamily,
+  frame=none,
+  framexleftmargin=0pt,
+  captionpos=b,
+  showspaces=false,
+  showstringspaces=false,
+  showtabs=false,         
+  tabsize=4,
+  breaklines=true,
+  breakatwhitespace=false}
+
+% Some useful commands and environments
+\usepackage{framed}
+\newenvironment{solution}%
+{\par{\noindent\small\textit{Solution:}}\vspace{-12pt}\begin{framed}}%
+{\end{framed}\par}
+
+\begin{document}
+\maketitle
+
+\section{PACE protocol}
+\subsection{A simple challenge-response protocol}
+\subsection{Mutual authentication}
+\begin{enumerate}[label=\alph*)]
+	\item It's not secure against a replay attack. We have to add the identity of the corresponding role to ensure injective agreement.
+	\item Fix the property
+\end{enumerate}
+\subsection{Introducing a session key}
+\begin{enumerate}[label=\alph*)]
+	\item Solution a
+	\item Solution b
+\end{enumerate}
+\subsection{Replace the password by a nonce}
+\subsection{Introducing Diffie-Hellman: The PACE protocol}
+\begin{enumerate}[label=\alph*)]
+	\item Solution a
+	\item Solution b
+	\item Solution c
+	\item Solution d
+\end{enumerate}
+\section{The Off-the-Record Messaging Protocol}
+\subsection{Modeling the original OTR Key Exchange}
+\subsection{Authentication Failure}
+\subsection{Improvement}
+\subsection{SIGMA}
+\end{document}

@@ -1,0 +1,98 @@
+theory P1
+/*
+The following MAC-based challenge response protocol has to be  defined
+A -> B: x
+B -> A: [x]_k(a,b)
+*/
+begin
+functions: mac/2
+
+rule Generate_shared_Key:
+  [ Fr(~shared_kAB) ]
+  -->
+  [ !Ltk($A, $B, ~shared_kAB) ]
+
+// necessary for the proofing lemmas
+rule Reveal_ltk_A:
+  [ !Ltk(A, B, shared_kAB) ]
+  --[ Rev(A) ]->
+  [ Out(shared_kAB) ]
+
+// necessary for the proofing lemmas
+rule Reveal_ltk_B:
+  [ !Ltk(A, B, shared_kAB) ]
+  --[ Rev(B) ]->
+  [ Out(shared_kAB) ]
+
+// Protocol
+
+// Initialize initiator A   
+rule Init_A:
+  [Fr(~id) 
+  ,!Ltk(A, B, shared_kAB) ]
+  --[ INIT_A(A, B, shared_kAB) ]->
+  [ St_A_0(A, B, ~id, shared_kAB) ]
+
+// Initialize  responder B
+rule Init_B:
+  [Fr(~id) 
+  ,!Ltk(A, B, shared_kAB) ]
+  --[ INIT_B(B, A, shared_kAB) ]->
+  [ St_B_0(B, A, ~id, shared_kAB) ]
+
+// A sends nonce x
+rule A_0:
+  [ Fr(~x)
+  , St_A_0(A, B, ~id, shared_kAB) ]
+  --[ OUT_A_0(A, B, ~x) ]->
+  [ Out(~x)
+  , St_A_1(A, B, ~id, ~x, shared_kAB) ]
+
+// B receives nonce x
+rule B_0:
+  [ St_B_0(B, A, ~id, shared_kAB)
+  , In(x) ]
+  --[ IN_B_0(B, A, x)
+    , Running(B, A, <'I','R',x>)
+    , Honest(A) ]->
+  [ St_B_1(B, A, ~id, x, shared_kAB) ]
+
+// B sends message m (MAC of x)
+rule B_1:
+  let m = mac(x, shared_kAB) in
+  [ St_B_1(B, A, ~id, x, shared_kAB) ]
+  --[ OUT_B_1(B, A, m) ]->
+  [ Out(m) ]
+
+// A receives message m (MAC of x)
+rule A_1:
+  let m = mac(x, shared_kAB) in
+  [ In(m)
+  , St_A_1(A, B, ~id, x, shared_kAB) ]
+  --[ IN_A_1(A, B, m)
+    , Commit(A, B, <'I','R',x>)
+    , Honest(B) ]->
+  []
+
+// Lemmas
+
+// it's executable
+lemma executable:
+  exists-trace
+    "Ex A B m #i.
+       IN_A_1(A, B, m)@i
+       & not (A = B)
+       & not (Ex #k. Rev(A)@k) & not (Ex #k. Rev(B)@k)"
+
+// satisfies authentication property that A injectively agrees with B on the nonce x
+lemma injectiveAgreement:
+  "All a b t #i. 
+    Commit(a,b,<'I','R',t>) @i
+    ==> (Ex #j. Running(b,a,<'I','R',t>) @j 
+        & not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>) @i2
+                           & not (#i2 = #i)))
+              | (Ex X #r. Rev(X)@r & Honest(X) @i)"
+
+end
+
+end
