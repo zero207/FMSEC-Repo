@@ -1,0 +1,156 @@
+theory PACE_4
+begin
+
+builtins: symmetric-encryption
+functions: mac/2, kdf/3, h/1
+
+/*
+1. A -> B: x, {s}h(k(A,B))
+2. B -> A: y
+3. A -> B: ['A', y]kdf(s, x, y)
+4. B -> A: ['B', x]kdf(s, x, y)
+*/
+
+// Shared key infrastructure rules
+
+rule Register_shared_key:
+    [ Fr(~kAB) ]
+    -->
+    [ !LtMac($A, $B, ~kAB) ]
+
+rule Reveal_shk_A:
+    [ !LtMac(A, B, kAB) ]
+    --[ Rev(A) ]->
+    [ Out(kAB) ]
+
+  rule Reveal_shk_B:
+    [ !LtMac(A, B, kAB) ]
+    --[ Rev(B) ]->
+    [ Out(kAB) ]
+
+// Initialisation rules
+
+//Initialise A
+rule Initialise_A:
+    [ Fr(~id), !LtMac(A, B, kAB) ]
+    --[ Create_A(A, ~id, 'roleA') ]->
+    [ St_A_1(A, ~id, B, kAB) ]
+
+//Initialise B
+rule Initialise_B:
+    [ Fr(~id), !LtMac(A, B, kAB) ]
+    --[ Create_B(B, ~id, 'roleB') ]->
+    [ St_B_1(B, ~id, A, kAB) ]
+
+// Protocol rules
+
+//A sends message <x, senc(s, h(kAB))>
+rule A_1_send:
+    [ Fr(~x), Fr(~s)
+    , St_A_1(A, id, B, kAB) ]
+    --[ Send(A, B, <~x, senc(~s, h(kAB))>) ]->
+    [ St_A_2(A, id, B, ~x, kAB, ~s)
+    , Out(<~x, senc(~s, h(kAB))>) ]
+
+//B sends message y
+rule B_1_send:
+    [ Fr(~y)
+    , St_B_1(B, id, A, kAB) ]
+    --[ Send(B, A, ~y) ]->
+    [ St_B_2(B, id, A, ~y, kAB)
+    , Out(~y) ]
+
+//A receives message y
+rule A_2_receive:
+    [ St_A_2(A, id, B, x, kAB, s)
+    , In(y) ]
+    --[ Recv(A, B, y)]->
+    [ St_A_3(A, id, B, x, kAB, s, y) ]
+
+//B receives message <x, senc(s, h(kAB))>
+rule B_2_receive:
+    let msg = <x, senc(s, h(kAB))> in
+    [ St_B_2(B, id, A, y, kAB)
+    , In(msg) ]
+    --[ Recv(B, A, msg)]->
+    [ St_B_3(B, id, A, y, kAB, x, s) ]
+
+//A sends message my (MAC of <'A', y> with session key)
+rule A_3_send:
+    let Kab = kdf(s, x, y) //Kab is the session key
+         my = mac(Kab, <'A', y>) in
+    [ St_A_3(A, id, B, x, kAB, s, y) ]
+    --[ Send(A, B,  my)
+    , Running(A, B, <'R', 'I', x, y>) ]->
+    [ St_A_4(A, id, B, x, kAB, s, y), Out(my) ]
+
+//B sends message mx (MAC of <'B', x> with session key)
+rule B_3_send:
+    let Kab = kdf(s, x, y) //Kab is the session key
+         mx = mac(Kab, <'B', x>) in
+    [ St_B_3(B, id, A, y, kAB, x, s) ]
+    --[ Send(B, A,  mx)
+    , Running(B, A, <'I', 'R', x, y>) ]->
+    [ St_B_4(B, id, A, y, kAB, x, s), Out(mx) ]
+
+//A receives message mx (MAC of <'B', x> with session key)
+rule A_4_receive:
+    let Kab = kdf(s, x, y)
+         mx = mac(Kab, <'B', x>) in
+    [ St_A_4(A, id, B, x, kAB, s, y)
+    , In(mx) ]
+    --[ Recv(A, B,  mx)
+      , Commit(A, B, <'I', 'R', x, y>)
+      , Secret(A, Kab)
+      , Honest(A)
+      , Honest(B) ]->
+    [ St_A_5(A, id, B, x, kAB, s, y) ]
+
+//B receives message my (MAC of <'A', y> with session key)
+rule B_4_receive:
+    let Kab = kdf(kAB, x, y)
+         my = mac(Kab, <'A', y>) in
+    [ St_B_4(B, id, A, y, kAB, x, s)
+    , In(my) ]
+    --[ Recv(B, A,  my)
+      , Commit(B, A, <'R', 'I', x, y>)
+      , Secret(B, Kab)
+      , Honest(A)
+      , Honest(B) ]->
+    [ St_B_5(B, id, A, y, kAB, x, s) ]
+
+
+// Lemmas
+
+// succeeds
+lemma executable:
+  exists-trace
+    "Ex A B mx my #i #j.
+       Recv(A, B, mx)@i & Recv(B, A, my)@j
+       & not (A = B)
+       & not (Ex #k. Rev(A)@k) & not (Ex #k. Rev(B)@k)
+    "
+
+lemma injectiveAgreementInitiator:
+  "All a b t #i.
+    Commit(a, b, <'I','R',t>)@i
+    ==> (Ex #j. Running(b, a,<'I', 'R', t>)@j
+             & not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>) @i2
+             & not (#i2 = #i)))
+           | (Ex X #r. Rev(X)@r)"
+
+lemma injectiveAgreementResponder:
+  "All a b t #i.
+    Commit(a, b, <'R','I',t>)@i
+    ==> (Ex #j. Running(b, a,<'R', 'I', t>)@j
+          & not (Ex a2 b2 #i2. Commit(a2,b2,<'R','I',t>) @i2
+          & not (#i2 = #i)))
+        | (Ex X #r. Rev(X)@r)"
+
+lemma secrecy:
+  "All A x #i.
+    Secret(A,x) @i ==>
+    not (Ex #j. K(x)@j)
+        | (Ex X #r. Rev(X)@r & Honest(X) @i)"
+
+end
