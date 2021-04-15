@@ -6,8 +6,8 @@ functions: mac/2
 /*
 1. A -> B: x
 2. B -> A: y
-3. A -> B: [A x, y]k(B,A)
-4. B -> A: [B, x, y]k(A,B)
+3. A -> B: ['A', x, y]k(B,A)
+4. B -> A: ['B', x, y]k(A,B)
 */
 
 // Shared key infrastructure rules
@@ -73,34 +73,34 @@ rule B_2_receive:
     --[ Recv(B, A, x)]->
     [ St_B_3(B, id, A, y, kAB, kBA, x) ]
 
-//A sends message my (MAC of <A, x, y>)
+//A sends message my (MAC of <'A', x, y> with kBA)
 rule A_3_send:
-    let my = mac(kBA, <A, x, y>) in
+    let my = mac(kBA, <'A', x, y>) in
     [ St_A_3(A, id, B, x, kAB, kBA, y) ]
     --[ Send(A, B,  my)
     , Running(A, B, <'R', 'I', x, y>) ]->
     [ St_A_4(A, id, B, x, kAB, kBA, y), Out(my) ]
 
-//B sends message mx (MAC of <B, x, y>)
+//B sends message mx (MAC of <'B', x, y> with kAB)
 rule B_3_send:
-    let mx = mac(kAB, <B, x, y>) in
+    let mx = mac(kAB, <'B', x, y>) in
     [ St_B_3(B, id, A, y, kAB, kBA, x) ]
     --[ Send(B, A,  mx)
     , Running(B, A, <'I', 'R', x, y>) ]->
     [ St_B_4(B, id, A, y, kAB, kBA, x), Out(mx) ]
 
-//A receives message mx (MAC of <A, x, y>)
+//A receives message mx (MAC of <'B', x, y> with kAB)
 rule A_4_receive:
-    let mx = mac(kAB, <A, x, y>) in
+    let mx = mac(kAB, <'B', x, y>) in
     [ St_A_4(A, id, B, x, kAB, kBA, y)
     , In(mx) ]
     --[ Recv(A, B,  mx)
       , Commit(A, B, <'I', 'R', x, y>) ]->
     [ St_A_5(A, id, B, x, kAB, kBA, y) ]
 
-//B receives message my (MAC of <B, x, y>)
+//B receives message my (MAC of <'A', x, y> with kBA)
 rule B_4_receive:
-    let my = mac(kBA, <B, x, y>) in
+    let my = mac(kBA, <'A', x, y>) in
     [ St_B_4(B, id, A, y, kAB, kBA, x)
     , In(my) ]
     --[ Recv(B, A,  my)
