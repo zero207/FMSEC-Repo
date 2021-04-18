@@ -1,0 +1,192 @@
+theory P5ab
+/*
+Extent the process of sending x with the high-entropy nonce s
+A -> B: g^x, p, {s{h(k(A,B))}}K(a,b)
+B -> A: g^y
+A -> B: ['I',g^y]_g^xy
+B -> A: ['R',g^x]_g^yx
+*/
+begin
+
+builtins: hashing, symmetric-encryption, diffie-hellman
+functions: mac/2, map/2
+
+rule Generate_shared_Key:
+  [ Fr(~shared_kAB) ]
+  -->
+  [ !Ltk($A, $B, ~shared_kAB) ]
+
+// necessary for the proofing lemmas
+rule Reveal_ltk_A:
+  [ !Ltk(A, B, shared_kAB) ]
+  --[ Rev(A)]->
+  [ Out(shared_kAB) ]
+
+// necessary for the proofing lemmas
+rule Reveal_ltk_B:
+  [ !Ltk(A, B, shared_kAB) ]
+  --[ Rev(B) ]->
+  [ Out(shared_kAB) ]
+
+// Protocol
+
+// Initialize initiator A   
+rule Init_A:
+  [Fr(~id) 
+  ,!Ltk(A, B, shared_kAB) ]
+  --[ INIT_A(A, B, shared_kAB) ]->
+  [ St_A_0(A, B, ~id, shared_kAB) ]
+
+// A sends nonce x
+rule A_0:
+    let
+      g = map(~s,~p)
+      high_entropyPW = <g^~x,senc(~s,h(shared_kAB)),~p>
+    in
+  [ Fr(~x)
+  , Fr(~s)
+  , Fr(~p)
+  , St_A_0(A, B, ~id, shared_kAB) ]
+  --[ OUT_A_0(A, B, high_entropyPW) ]->
+  [ Out(high_entropyPW)
+  , St_A_1(A, B, ~id, ~x, ~s, ~p, shared_kAB) ]
+
+// A receives nonce y
+rule A_1:
+    let
+      g = map(s,p)
+    in
+  [ St_A_1(A, B, ~id, x, s, p, shared_kAB)
+  ,In(gy) ]
+  --[IN_A_1(A, B, gy)
+  , Running(A, B, <'R','I', g^x, gy>)
+  , Honest(A)
+  , Honest(B) ]->
+  [ St_A_2(A, B, ~id, x, gy, s, p, shared_kAB) ]
+
+// A sends mac of y with session key Kab and identity 'I'
+ rule A_2:
+    let 
+      g = map(s,p)
+      Kab = h((gy)^x)
+      my = mac(<'I',gy>, Kab)  
+    in
+   [ St_A_2(A, B, ~id, x, gy, s, p, shared_kAB) ]
+   --[OUT_A_2(A, B, my) ]->
+   [Out(my)
+   ,St_A_3(A, B, ~id, x, gy, s, p, shared_kAB)  ] 
+
+// A receives mac of x bounded with R and session key Kab
+rule A_3:
+  let 
+    g = map(s,p)
+    Kab = h((gy)^x)
+    mx = mac(<'R',g^x>, Kab) 
+  in
+  [ In(mx)
+  , St_A_3(A, B, ~id, x, gy, s, p, shared_kAB) ]
+  --[ IN_A_3(A, B, mx)
+    , Secret(A,Kab)
+    , DONE(A, B, g^x, gy, s, shared_kAB)
+    , Commit(A, B, <'I','R',g^x,gy>)
+    , Honest(A)]->
+  []
+
+// Initialize  responder B
+rule Init_B:
+  [Fr(~id) 
+  ,!Ltk(A, B, shared_kAB) ]
+  --[ INIT_B(B, A, shared_kAB) ]->
+  [ St_B_0(B, A, ~id, shared_kAB) ]
+
+// B receives nonces x and s
+rule B_0:
+    let
+      g = map(s,p)
+      high_entropyPW = <gx,senc(s,h(shared_kAB)),p>
+    in
+  [ St_B_0(B, A, ~id, shared_kAB)
+  , In(high_entropyPW) ]
+  --[ IN_B_0(B, A, high_entropyPW) ]->
+  [ St_B_1(B, A, ~id, gx, s,p , shared_kAB) ]
+
+// Generate nonce y
+rule B_1:
+  let
+    g = map(s,p)
+  in
+  [ Fr(~y)
+  ,St_B_1(B, A, ~id, gx, s, p, shared_kAB) ]
+  --[OUT_B_1(B, A, g^~y)
+  , Running(B, A, <'I','R', gx, g^~y>)
+  , Honest(B)
+  , Honest(A)
+  ]->
+  [ St_B_2(B, A, ~id, gx, ~y, s, p, shared_kAB)
+  , Out(g^~y) ]
+
+// B receives MAC of y bounded with session key Kab and I
+rule B_2:
+  let
+    g = map(s,p)
+    Kab = h((gx)^y)
+    my = mac(<'I' ,g^y>, Kab)
+  in
+  [ St_B_2(B, A, ~id, gx, y, s, p, shared_kAB)
+  ,In(my) ]
+  --[ IN_B_2(B, A, my)
+  , Commit(B, A, <'R','I', gx, g^y>)
+  , Honest(B) ]->
+  [ St_B_3(B, A, ~id, gx, y, s, p, shared_kAB) ]
+
+// B sends MAC mx bounded with R using session key Kab
+rule B_3:
+  let 
+    g = map(s,p)
+    Kab = h((gx)^y)
+    mx = mac(<'R' ,gx>, Kab) 
+  in
+  [ St_B_3(B, A, ~id, gx, y, s, p, shared_kAB) ]
+  --[ OUT_B_3(B, A, mx) 
+    , Secret(B, Kab)
+    , Honest(B)]->
+  [ Out(mx) ]
+
+// Lemmas
+
+// it's executable
+lemma executable:
+  exists-trace
+    "Ex A B x y s k #j.
+         DONE(A, B, x, y, s, k)@j
+       & not (A = B)
+       & not (Ex #k. Rev(A)@k) & not (Ex #k. Rev(B)@k)
+       & not (Ex x y z u l m #p #q. INIT_A(x, y, l)@p & INIT_A(z, u, m)@q & not(#p = #q))
+       & not (Ex x y z u l m #p #q. INIT_B(x, y, l)@p & INIT_B(z, u, m)@q & not(#p = #q))
+       & not (Ex x y n t l #i. DONE(x, y, n, n, t, l)@i)"
+
+//succeeds
+lemma injectiveagreementINITIATOR:
+  "All a b t #i. 
+    Commit(a,b,<'I','R',t>) @i
+    ==> (Ex #j. Running(b,a,<'I','R',t>) @j 
+        & not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>) @i2
+                           & not (#i2 = #i)))
+              | (Ex X #r. Rev(X)@r & Honest(X) @i)"
+
+//succeeds
+lemma injectiveagreementRESPONDER:
+  "All a b t #i. 
+    Commit(a,b,<'R','I',t>) @i
+    ==> (Ex #j. Running(b,a,<'R','I',t>) @j 
+              & not (Ex a2 b2 #i2. Commit(a2,b2,<'R','I',t>) @i2
+                                 & not (#i2 = #i)))
+              | (Ex X #r. Rev(X)@r & Honest(X) @i)"
+
+//succeeds
+lemma secrecy_PFS:
+  "All A x #i. 
+    Secret(A,x) @i ==> 
+    not (Ex #j. K(x)@j)
+        | (Ex X #r. Rev(X)@r & Honest(X) @i & r < i)"
+end
