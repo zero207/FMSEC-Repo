@@ -37,13 +37,6 @@ rule Init_A:
   --[ INIT_A(A, B, shared_kAB) ]->
   [ St_A_0(A, B, ~id, shared_kAB) ]
 
-// Initialize  responder B
-rule Init_B:
-  [Fr(~id) 
-  ,!Ltk(A, B, shared_kAB) ]
-  --[ INIT_B(B, A, shared_kAB) ]->
-  [ St_B_0(B, A, ~id, shared_kAB) ]
-
 // A sends nonce x
 rule A_0:
     let
@@ -69,7 +62,7 @@ rule A_1:
 // A sends mac of y with session key Kab and identity 'I'
  rule A_2:
     let 
-      Kab = kdf(s, x,y)
+      Kab = kdf(s, x, y)
       my = mac(<'I',y>, Kab)  
     in
    [ St_A_2(A, B, ~id, x, y, s, shared_kAB) ]
@@ -80,7 +73,7 @@ rule A_1:
 // A receives mac of x bounded with R and session key Kab
 rule A_3:
   let 
-    Kab = kdf(s,x,y)
+    Kab = kdf(s, x, y)
     mx = mac(<'R',x>, Kab) 
   in
   [ In(mx)
@@ -92,6 +85,13 @@ rule A_3:
     , Honest(A)
     , Honest(B) ]->
   []
+
+// Initialize  responder B
+rule Init_B:
+  [Fr(~id) 
+  ,!Ltk(A, B, shared_kAB) ]
+  --[ INIT_B(B, A, shared_kAB) ]->
+  [ St_B_0(B, A, ~id, shared_kAB) ]
 
 // B receives nonces x and s
 rule B_0:
@@ -106,7 +106,7 @@ rule B_0:
 // Generate nonce y
 rule B_1:
   [ Fr(~y)
-  ,St_B_1(B, A, x, s, ~id, shared_kAB) ]
+  ,St_B_1(B, A, ~id, x, s, shared_kAB) ]
   --[OUT_B_1(B, A, ~y)
   , Running(B, A, <'I','R', x, ~y>)
   , Honest(B)
@@ -117,13 +117,13 @@ rule B_1:
 // B receives MAC of y bounded with session key Kab and I
 rule B_2:
   let
-    Kab = kdf(s,x,y)
-    my = mac(<'I',y>,Kab)
+    Kab = kdf(s, x, y)
+    my = mac(<'I' ,y>, Kab)
   in
   [ St_B_2(B, A, ~id, x, y, s, shared_kAB)
   ,In(my) ]
-  --[ IN_B_2(B,A,my)
-  , Commit(B,A, <'R','I', x, y>)
+  --[ IN_B_2(B, A, my)
+  , Commit(B, A, <'R','I', x, y>)
   , Honest(B)
   , Honest(A)  
   ]->
@@ -133,10 +133,13 @@ rule B_2:
 rule B_3:
   let 
     Kab = kdf(s,x,y)
-    mx = mac(<'R',x>, Kab) 
+    mx = mac(<'R' ,x>, Kab) 
   in
   [ St_B_3(B, A, ~id, x, y, s, shared_kAB) ]
-  --[ OUT_B_3(B, A, mx) ]->
+  --[ OUT_B_3(B, A, mx) 
+    , Secret(B, Kab)
+    , Honest(B)
+    , Honest(A) ]->
   [ Out(mx) ]
 
 // Lemmas
@@ -144,13 +147,13 @@ rule B_3:
 // it's executable
 lemma executable:
   exists-trace
-    "Ex A B x y s k #i.
-        DONE(A, B, x, y, s, k)@i
-        & not (A = B)
-        & not (Ex #k. Rev(A)@k) & not(Ex #k. Rev(B)@k)
-        & not (Ex x y z u l m #p #q. INIT_A(x, y, l)@p & INIT_A(z, u, m)@q & not(#p = #q))
-        & not (Ex x y z u l m #p #q. INIT_B(x, y, l)@p & INIT_B(z, u, m)@q & not(#p = #q))
-        & not (Ex x y n t l #i. DONE(x, y, n, n, t, l)@i)"
+    "Ex A B x y s k #j.
+         DONE(A, B, x, y, s, k)@j
+       & not (A = B)
+       & not (Ex #k. Rev(A)@k) & not (Ex #k. Rev(B)@k)
+       & not (Ex x y z u l m #p #q. INIT_A(x, y, l)@p & INIT_A(z, u, m)@q & not(#p = #q))
+       & not (Ex x y z u l m #p #q. INIT_B(x, y, l)@p & INIT_B(z, u, m)@q & not(#p = #q))
+       & not (Ex x y n t l #i. DONE(x, y, n, n, t, l)@i)"
        
 
 // Succeeds for I

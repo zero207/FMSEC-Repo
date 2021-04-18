@@ -118,7 +118,10 @@ rule B_3:
     mx = mac(<'R',x>, shared_kAB) 
   in
   [ St_B_3(B, A, ~id, x, y, shared_kAB) ]
-  --[ OUT_B_3(B, A, mx) ]->
+  --[ OUT_B_3(B, A, mx) 
+    , Secret(B, Kab)
+    , Honest(B)
+    , Honest(A) ]->
   [ Out(mx) ]
 
 // Lemmas
