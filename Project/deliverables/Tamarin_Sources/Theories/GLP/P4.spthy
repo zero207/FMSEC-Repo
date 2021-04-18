@@ -46,90 +46,97 @@ rule Init_B:
 
 // A sends nonce x
 rule A_0:
+    let
+      high_entropyPW = <~x,senc(h(shared_kAB))>
+    in
   [ Fr(~x)
+  , Fr(~s)
   , St_A_0(A, B, ~id, shared_kAB) ]
-  --[ OUT_A_0(A, B, ~x) ]->
-  [ Out(~x)
-  , St_A_1(A, B, ~id, ~x, shared_kAB) ]
+  --[ OUT_A_0(A, B, high_entropyPW) ]->
+  [ Out(high_entropyPW)
+  , St_A_1(A, B, ~id, ~x, ~s, shared_kAB) ]
 
 // A receives nonce y
 rule A_1:
-  [ St_A_1(A, B, ~id, x, shared_kAB)
+  [ St_A_1(A, B, ~id, x, s, shared_kAB)
   ,In(y) ]
   --[IN_A_1(A, B, y)
   , Running(A, B, <'R','I', x, y>)
   , Honest(A)
   , Honest(B) ]->
-  [ St_A_2(A, B, ~id, x, y, shared_kAB) ]
+  [ St_A_2(A, B, ~id, x, y, , s, shared_kAB) ]
 
 // A sends mac of y with session key Kab and identity 'I'
  rule A_2:
     let 
-      Kab = kdf(shared_kAB, x,y)
-      my = mac(Kab,y)  
+      Kab = kdf(s, x,y)
+      my = mac(<'I',y>, Kab)  
     in
-   [ St_A_2(A, B, ~id, x, y, shared_kAB) ]
+   [ St_A_2(A, B, ~id, x, y, s, shared_kAB) ]
    --[OUT_A_2(A, B, my) ]->
    [Out(my)
-   ,St_A_3(A, B, ~id, x, y, shared_kAB)  ] 
+   ,St_A_3(A, B, ~id, x, y, s, shared_kAB)  ] 
 
 // A receives mac of x bounded with R and session key Kab
 rule A_3:
   let 
-    Kab = kdf(shared_kAB,x,y)
+    Kab = kdf(s,x,y)
     mx = mac(<'R',x>, Kab) 
   in
   [ In(mx)
-  , St_A_3(A, B, ~id, x, y, shared_kAB) ]
+  , St_A_3(A, B, ~id, x, y, s, shared_kAB) ]
   --[ IN_A_3(A, B, mx)
     , Secret(A,Kab)
-    , DONE(A, B, x, y, shared_kAB)
+    , DONE(A, B, x, y, s, shared_kAB)
     , Commit(A, B, <'I','R',x,y>)
     , Honest(A)
     , Honest(B) ]->
   []
 
-// B receives nonce x
+// B receives nonces x and s
 rule B_0:
+    let
+      high_entropyPW = <x,senc(s,h(shared_kAB)>
+    in
   [ St_B_0(B, A, ~id, shared_kAB)
-  , In(x) ]
-  --[ IN_B_0(B, A, x) ]->
-  [ St_B_1(B, A, ~id, x, shared_kAB) ]
+  , In(high_entropyPW) ]
+  --[ IN_B_0(B, A, high_entropyPW) ]->
+  [ St_B_1(B, A, ~id, x, s, shared_kAB) ]
 
 // Generate nonce y
 rule B_1:
   [ Fr(~y)
-  ,St_B_1(B, A, x, ~id, shared_kAB) ]
+  ,St_B_1(B, A, x, s, ~id, shared_kAB) ]
   --[OUT_B_1(B, A, ~y)
   , Running(B, A, <'I','R', x, ~y>)
   , Honest(B)
   , Honest(A)
   ]->
-  [ St_B_2(B, A, ~id, x, ~y, shared_kAB) ]
+  [ St_B_2(B, A, ~id, x, ~y, s, shared_kAB) ]
 
 // B receives MAC of y bounded with session key Kab and I
 rule B_2:
   let
-    Kab = kdf(shared_kAB,x,y)
-    my = mac(<'I',y ,x>,Kab)
+    Kab = kdf(s,x,y)
+    my = mac(<'I',y>,Kab)
   in
-  [ St_B_2(B, A, ~id, x, y, shared_kAB)
+  [ St_B_2(B, A, ~id, x, y, s, shared_kAB)
   ,In(my) ]
   --[ IN_B_2(B,A,my)
   , Commit(B,A, <'R','I', x, y>)
   , Honest(B)
   , Honest(A)  
   ]->
-  [ St_B_3(B, A, ~id, x, y, shared_kAB) ]
+  [ St_B_3(B, A, ~id, x, y, s, shared_kAB) ]
 
 // B sends MAC mx bounded with R using session key Kab
 rule B_3:
   let 
-    Kab = kdf(shared_kAB,x,y)
+    Kab = kdf(s,x,y)
     mx = mac(<'R',x>, Kab) 
   in
-  [ St_B_3(B, A, ~id, x, y, shared_kAB) ]
-  --[ OUT_B_1(B, A, mx) ]->
+  [ St_B_3(B, A, ~id, x, y, s, shared_kAB) ]
+  --[ OUT_B_3(B, A, mx) ]->
   [ Out(mx) ]
 
 // Lemmas
@@ -137,8 +144,8 @@ rule B_3:
 // it's executable
 lemma executable:
   exists-trace
-    "Ex A B x y k #i.
-        DONE(A, B, x, y, k)@i
+    "Ex A B x y s k #i.
+        DONE(A, B, x, y, s, k)@i
         & not (A = B)
         & not (Ex #k. Rev(A)@k) & not(Ex #k. Rev(B)@k)
         & not (Ex x y z u l m #p #q. INIT_A(x, y, l)@p & INIT_A(z, u, m)@q & not(#p = #q))

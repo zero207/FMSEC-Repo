@@ -65,7 +65,7 @@ rule A_1:
  rule A_2:
     let 
       Kab = kdf(shared_kAB, x,y)
-      my = mac(Kab,y)  
+      my = mac(<'I',y>, Kab)  
     in
    [ St_A_2(A, B, ~id, x, y, shared_kAB) ]
    --[OUT_A_2(A, B, my) ]->
@@ -128,7 +128,7 @@ rule B_3:
     mx = mac(<'R',x>, Kab) 
   in
   [ St_B_3(B, A, ~id, x, y, shared_kAB) ]
-  --[ OUT_B_1(B, A, mx) ]->
+  --[ OUT_B_3(B, A, mx) ]->
   [ Out(mx) ]
 
 // Lemmas

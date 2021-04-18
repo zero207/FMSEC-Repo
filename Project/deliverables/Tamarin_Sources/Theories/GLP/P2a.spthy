@@ -118,7 +118,7 @@ rule B_3:
     mx = mac(x, shared_kAB) 
   in
   [ St_B_3(B, A, ~id, x, y, shared_kAB) ]
-  --[ OUT_B_1(B, A, mx) ]->
+  --[ OUT_B_3(B, A, mx) ]->
   [ Out(mx) ]
 
 // Lemmas
