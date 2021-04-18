@@ -1,4 +1,4 @@
-theory P3a
+theory P4
 /*
 Extent the process of sending x with the high-entropy nonce s
 A -> B: x, s{h(k(A,B))}
@@ -47,7 +47,7 @@ rule Init_B:
 // A sends nonce x
 rule A_0:
     let
-      high_entropyPW = <~x,senc(h(shared_kAB))>
+      high_entropyPW = <~x,senc(~s,h(shared_kAB))>
     in
   [ Fr(~x)
   , Fr(~s)
@@ -64,7 +64,7 @@ rule A_1:
   , Running(A, B, <'R','I', x, y>)
   , Honest(A)
   , Honest(B) ]->
-  [ St_A_2(A, B, ~id, x, y, , s, shared_kAB) ]
+  [ St_A_2(A, B, ~id, x, y, s, shared_kAB) ]
 
 // A sends mac of y with session key Kab and identity 'I'
  rule A_2:
@@ -96,7 +96,7 @@ rule A_3:
 // B receives nonces x and s
 rule B_0:
     let
-      high_entropyPW = <x,senc(s,h(shared_kAB)>
+      high_entropyPW = <x,senc(s,h(shared_kAB))>
     in
   [ St_B_0(B, A, ~id, shared_kAB)
   , In(high_entropyPW) ]
@@ -150,7 +150,7 @@ lemma executable:
         & not (Ex #k. Rev(A)@k) & not(Ex #k. Rev(B)@k)
         & not (Ex x y z u l m #p #q. INIT_A(x, y, l)@p & INIT_A(z, u, m)@q & not(#p = #q))
         & not (Ex x y z u l m #p #q. INIT_B(x, y, l)@p & INIT_B(z, u, m)@q & not(#p = #q))
-        & not (Ex x y n l #i. DONE(x, y, n, n, l)@i)"
+        & not (Ex x y n t l #i. DONE(x, y, n, n, t, l)@i)"
        
 
 // Succeeds for I
