@@ -77,7 +77,9 @@ rule A_3:
   [ In(mx)
   , St_A_3(A, B, id, x, y, shared_kAB, shared_kBA) ]
   --[ Recv(A, B, mx)
-    , Commit(A, B, <'I','R',x,y>) ]->
+    , Commit(A, B, <'I','R',x,y>)
+    , Honest(A)
+    , Honest(B) ]->
   []
 
 // Generate message y
@@ -113,7 +115,9 @@ rule B_3:
   [ St_B_3(B, A, id, x, y, shared_kAB, shared_kBA)
   ,In(my) ]
   --[ Recv(B,A,my)
-  , Commit(B,A, <'R','I', x, y>) ]->
+  , Commit(B,A, <'R','I', x, y>) 
+  , Honest(A)
+  , Honest(B) ]->
   [ ]
 
 // Lemmas
@@ -133,14 +137,14 @@ lemma nonInjectiveAgreementI:
   "All a b t #i. 
     Commit(a,b,<'I','R',t>) @i
     ==> (Ex #j. Running(b,a,<'I','R',t>) @j)
-      | (Ex X #r. Rev(X)@r)
+      | (Ex X #r. Rev(X)@r & Honest(X)@i)
   "
 
 lemma nonInjectiveAgreementR:
   "All a b t #i. 
     Commit(a,b,<'R','I',t>) @i
     ==> (Ex #j. Running(b,a,<'R','I',t>) @j)
-      | (Ex X #r. Rev(X)@r)
+      | (Ex X #r. Rev(X)@r & Honest(X)@i)
   "
 
 end
