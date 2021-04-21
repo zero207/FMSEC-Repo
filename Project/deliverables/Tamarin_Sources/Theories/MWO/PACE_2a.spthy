@@ -95,7 +95,9 @@ rule A_4_receive:
     [ St_A_4(A, id, B, x, kAB, kBA, y)
     , In(mx) ]
     --[ Recv(A, B,  mx)
-      , Commit(A, B, <'I', 'R', x, y>) ]->
+      , Commit(A, B, <'I', 'R', x, y>)
+      , Honest(A)
+      , Honest(B) ]->
     [ St_A_5(A, id, B, x, kAB, kBA, y) ]
 
 //B receives message my (MAC of y)
@@ -104,7 +106,9 @@ rule B_4_receive:
     [ St_B_4(B, id, A, y, kAB, kBA, x)
     , In(my) ]
     --[ Recv(B, A,  my)
-      , Commit(B, A, <'R', 'I', x, y>) ]->
+      , Commit(B, A, <'R', 'I', x, y>)
+      , Honest(A)
+      , Honest(B) ]->
     [ St_B_5(B, id, A, y, kAB, kBA, x) ]
 
 
@@ -124,13 +128,13 @@ lemma nonInjectiveAgreementInitiator:
   "All a b t #i.
     Commit(a, b, <'I','R',t>)@i
     ==> (Ex #j. Running(b, a,<'I', 'R', t>)@j)
-    | (Ex X #r. Rev(X)@r)"
+    | (Ex X #r. Rev(X)@r & Honest(X)@i)"
 
 // fails
 lemma nonInjectiveAgreementResponder:
      "All a b t #i.
     Commit(a, b, <'R','I',t>)@i
     ==> (Ex #j. Running(b, a,<'R', 'I', t>)@j)
-    | (Ex X #r. Rev(X)@r)"
+    | (Ex X #r. Rev(X)@r & Honest(X)@i)"
 
 end
