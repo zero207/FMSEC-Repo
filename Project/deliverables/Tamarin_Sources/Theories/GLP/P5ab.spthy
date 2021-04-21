@@ -1,28 +1,26 @@
-theory P4
+theory P5ab
 /*
 Extent the process of sending x with the high-entropy nonce s
-A -> B: x, s{h(k(A,B))}
-B -> A: y
-A -> B: ['A',y]_kdf(s, x, y)
-B -> A: ['B',x]_kdf(s, x, y)
+A -> B: g^x, p, {s{h(k(A,B))}}K(a,b)
+B -> A: g^y
+A -> B: ['A',g^y]_g^xy
+B -> A: ['B',g^x]_g^yx
 */
 begin
 
-builtins: hashing, symmetric-encryption
-functions: mac/2, kdf/3
+builtins: hashing, symmetric-encryption, diffie-hellman
+functions: map
 
 rule Generate_shared_Key:
   [ Fr(~shared_kAB)]
   -->
   [ !Ltk($A, $B, ~shared_kAB) ]
 
-// necessary for the proofing lemmas
 rule Reveal_ltk_A:
   [ !Ltk(A, B, shared_kAB) ]
   --[ Rev(A)]->
   [ Out(shared_kAB) ]
 
-// necessary for the proofing lemmas
 rule Reveal_ltk_B:
   [ !Ltk(A, B, shared_kAB) ]
   --[ Rev(B) ]->
@@ -44,44 +42,54 @@ rule Init_B:
   --[ Create_B(B, ~id, 'roleB') ]->
   [ St_B_0(B, A, ~id, shared_kAB) ]
 
-// A sends nonce x as message
+// Generate A's DHF key and nonce s - Use ltk as the hash of the shared_pw. Send g^x and s encrypted with ltk and p
 rule A_0:
+  let
+    g = map(~s, ~p)
+    msg = <g^~x, senc(~s, h(shared_kAB)), ~p>
+  in
   [ Fr(~x)
   , Fr(~s)
+  , Fr(~p)
   , St_A_0(A, B, id, shared_kAB) ]
-  --[ Send(A, B, <~x, senc(~s,h(shared_kAB))>) ]->
-  [ Out(<~x, senc(~s,h(shared_kAB))>)
-  , St_A_1(A, B, id, ~x, ~s, shared_kAB) ]
+  --[ Send(A, B, msg) ]->
+  [ Out(msg)
+  , St_A_1(A, B, id, ~x, ~s, ~p, shared_kAB) ]
 
-// A receives message y
+// A receives B's DHKey g^y
 rule A_1:
-  [ St_A_1(A, B, id, x, s, shared_kAB)
-  ,In(y) ]
-  --[Recv(A, B, y) ]->
-  [ St_A_2(A, B, id, x, y, s, shared_kAB) ]
+    let
+      g = map(s,p)
+    in
+  [ St_A_1(A, B, id, x, s, p, shared_kAB)
+  ,In(gy) ]
+  --[Recv(A, B, gy) ]->
+  [ St_A_2(A, B, id, x, s, p, gy, shared_kAB) ]
 
-// A sends mac(y)_k(a,b)
+// A sends mac of g^y bound with identity 'A' generated using session key
  rule A_2:
     let 
-      Kab = kdf(s, x, y)
-      my = mac(Kab,<'A', y>)  
+      g = map(s,p)
+      K = h((gy)^x)
+      my = senc(<'A', gy>), K)  
     in
-   [ St_A_2(A, B, id, x, y, s, shared_kAB) ]
+   [ St_A_2(A, B, id, p, x, s, gy, shared_kAB) ]
    --[Send(A, B, my)
-   , Running(A,B,<'R','I',x ,y> )]->
+   , Running(A,B,<'R','I',g^x ,gy> )]->
    [Out(my)
-   ,St_A_3(A, B, id, x, y, s, shared_kAB)  ] 
+   ,St_A_3(A, B, id, p, x, s, gy, shared_kAB)  ] 
 
-// A receives mac(x)_k(a,b) -> mx
+// A receives mac of g^x bound with identity 'B' generated using session key
 rule A_3:
-  let 
-    Kab = kdf(s, x, y)
-    mx = mac(Kab,<'B',x>) 
+  let
+    g = map(s,p) 
+    K = h((gy)^x)
+    mx = senc(<'B',g^x>, K) 
   in
   [ In(mx)
-  , St_A_3(A, B, id, x, y, s, shared_kAB) ]
+  , St_A_3(A, B, id, p, x, s, gy, shared_kAB) ]
   --[ Recv(A, B, mx)
-    , Commit(A, B, <'I','R', x, y>)
+    , Commit(A, B, <'I','R', g^x, gy>)
     , Secret(A, Kab)
     , Honest(A)
     , Honest(B) ]->
