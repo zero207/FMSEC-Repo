@@ -3,15 +3,15 @@ theory P3a
 The following MAC-based challenge response protocol has to be  defined
 A -> B: x
 B -> A: y
-A -> B: ['I',y]_k(a,b)
-B -> A: ['R',x]_k(a,b)
+A -> B: ['A',y]_kdf(k(a,b), x, y)
+B -> A: ['B',x]_kdf(k(a,b), x, §)
 */
 begin
 
 functions: mac/2, kdf/3
 
 rule Generate_shared_Key:
-  [ Fr(~shared_kAB) ]
+  [ Fr(~shared_kAB)]
   -->
   [ !Ltk($A, $B, ~shared_kAB) ]
 
@@ -19,13 +19,13 @@ rule Generate_shared_Key:
 rule Reveal_ltk_A:
   [ !Ltk(A, B, shared_kAB) ]
   --[ Rev(A)]->
-  [ Out(shared_kAB) ]
+  [ Out(<shared_kAB,shared_kBA>) ]
 
 // necessary for the proofing lemmas
 rule Reveal_ltk_B:
   [ !Ltk(A, B, shared_kAB) ]
   --[ Rev(B) ]->
-  [ Out(shared_kAB) ]
+  [ Out(<shared_kAB,shared_kBA>) ]
 
 // Protocol
 
@@ -33,141 +33,129 @@ rule Reveal_ltk_B:
 rule Init_A:
   [Fr(~id) 
   ,!Ltk(A, B, shared_kAB) ]
-  --[ INIT_A(A, B, shared_kAB) ]->
+  --[ Create_A(A, ~id, 'roleA') ]->
   [ St_A_0(A, B, ~id, shared_kAB) ]
 
 // Initialize  responder B
 rule Init_B:
   [Fr(~id) 
   ,!Ltk(A, B, shared_kAB) ]
-  --[ INIT_B(B, A, shared_kAB) ]->
+  --[ Create_B(B, ~id, 'roleB') ]->
   [ St_B_0(B, A, ~id, shared_kAB) ]
 
-// A sends nonce x
+// A sends nonce x as message
 rule A_0:
   [ Fr(~x)
-  , St_A_0(A, B, ~id, shared_kAB) ]
-  --[ OUT_A_0(A, B, ~x) ]->
+  , St_A_0(A, B, id, shared_kAB) ]
+  --[ Send(A, B, ~x) ]->
   [ Out(~x)
-  , St_A_1(A, B, ~id, ~x, shared_kAB) ]
+  , St_A_1(A, B, id, ~x, shared_kAB) ]
 
-// A receives nonce y
+// A receives message y
 rule A_1:
-  [ St_A_1(A, B, ~id, x, shared_kAB)
+  [ St_A_1(A, B, id, x, shared_kAB)
   ,In(y) ]
-  --[IN_A_1(A, B, y)
-  , Running(A, B, <'R','I', x, y>)
-  , Honest(A)
-  , Honest(B) ]->
-  [ St_A_2(A, B, ~id, x, y, shared_kAB) ]
+  --[Recv(A, B, y) ]->
+  [ St_A_2(A, B, id, x, y, shared_kAB) ]
 
-// A sends mac of y with session key Kab and identity 'I'
+// A sends mac(y)_k(a,b)
  rule A_2:
     let 
-      Kab = kdf(shared_kAB, x,y)
-      my = mac(<'I',y>, Kab)  
+      Kab = kdf(shared_kAB, x, y)
+      my = mac(Kab,<'A', y>)  
     in
-   [ St_A_2(A, B, ~id, x, y, shared_kAB) ]
-   --[OUT_A_2(A, B, my) ]->
+   [ St_A_2(A, B, id, x, y, shared_kAB) ]
+   --[Send(A, B, my)
+   , Running(A,B,<'R','I',x ,y> )]->
    [Out(my)
-   ,St_A_3(A, B, ~id, x, y, shared_kAB)  ] 
+   ,St_A_3(A, B, id, x, y, shared_kAB)  ] 
 
-// A receives mac of x bounded with R and session key Kab
+// A receives mac(x)_k(a,b) -> mx
 rule A_3:
   let 
-    Kab = kdf(shared_kAB,x,y)
-    mx = mac(<'R',x>, Kab) 
+    Kab = kdf(shared_kAB, x, y)
+    mx = mac(Kab,<'B',x>) 
   in
   [ In(mx)
-  , St_A_3(A, B, ~id, x, y, shared_kAB) ]
-  --[ IN_A_3(A, B, mx)
-    , Secret(A,Kab)
-    , DONE(A, B, x, y, shared_kAB)
-    , Commit(A, B, <'I','R',x,y>)
+  , St_A_3(A, B, id, x, y, shared_kAB) ]
+  --[ Recv(A, B, mx)
+    , Commit(A, B, <'I','R', x, y>)
+    , Secret(A, Kab)
     , Honest(A)
     , Honest(B) ]->
   []
 
-// B receives nonce x
+// Generate message y
 rule B_0:
-  [ St_B_0(B, A, ~id, shared_kAB)
-  , In(x) ]
-  --[ IN_B_0(B, A, x) ]->
-  [ St_B_1(B, A, ~id, x, shared_kAB) ]
-
-// Generate nonce y
-rule B_1:
   [ Fr(~y)
-  ,St_B_1(B, A, x, ~id, shared_kAB) ]
-  --[OUT_B_1(B, A, ~y)
-  , Running(B, A, <'I','R', x, ~y>)
-  , Honest(B)
-  , Honest(A)
-  ]->
-  [ St_B_2(B, A, ~id, x, ~y, shared_kAB) ]
+  ,St_B_0(B, A, id, shared_kAB) ]
+  --[Send(B, A, ~y) ]->
+  [ St_B_1(B, A, id, ~y, shared_kAB) ]
 
-// B receives MAC of y bounded with session key Kab and I
+// B receives message x
+rule B_1:
+  [ St_B_1(B, A, id, y, shared_kAB)
+  , In(x) ]
+  --[ Recv(B, A, x) ]->
+  [ St_B_2(B, A, id, x, y, shared_kAB) ]
+
+// B sends message mx (MAC of x)
 rule B_2:
-  let
-    Kab = kdf(shared_kAB,x,y)
-    my = mac(<'I',y ,x>,Kab)
-  in
-  [ St_B_2(B, A, ~id, x, y, shared_kAB)
-  ,In(my) ]
-  --[ IN_B_2(B,A,my)
-  , Commit(B,A, <'R','I', x, y>)
-  , Honest(B)
-  , Honest(A)  
-  ]->
-  [ St_B_3(B, A, ~id, x, y, shared_kAB) ]
-
-// B sends MAC mx bounded with R using session key Kab
-rule B_3:
   let 
-    Kab = kdf(shared_kAB,x,y)
-    mx = mac(<'R',x>, Kab) 
+    Kab = kdf(shared_kAB, x, y)
+    mx = mac(Kab,<'B', x>) 
   in
-  [ St_B_3(B, A, ~id, x, y, shared_kAB) ]
-  --[ OUT_B_3(B, A, mx) 
-    , Secret(B, Kab)
-    , Honest(B)
-    , Honest(A) ]->
-  [ Out(mx) ]
+  [ St_B_2(B, A, id, x, y, shared_kAB) ]
+  --[ Send(B, A, mx)
+  , Running(B,A, <'I','R', x, y>) ]->
+  [ Out(mx)
+  , St_B_3(B, A, id, x, y, shared_kAB) ]
+
+// B receives MAC of y -> my
+rule B_3:
+  let
+    Kab = kdf(shared_kAB, x, y)
+    my = mac(Kab,<'A', y>)
+  in
+  [ St_B_3(B, A, id, x, y, shared_kAB)
+  ,In(my) ]
+  --[ Recv(B,A,my)
+  , Commit(B,A, <'R','I', x, y>) 
+  , Secret(B, Kab)
+  , Honest(A)
+  , Honest(B) ]->
+  [ ]
 
 // Lemmas
 
-// it's executable
+// succeeds
 lemma executable:
   exists-trace
-    "Ex A B x y k #i.
-        DONE(A, B, x, y, k)@i
-        & not (A = B)
-        & not (Ex #k. Rev(A)@k) & not(Ex #k. Rev(B)@k)
-        & not (Ex x y z u l m #p #q. INIT_A(x, y, l)@p & INIT_A(z, u, m)@q & not(#p = #q))
-        & not (Ex x y z u l m #p #q. INIT_B(x, y, l)@p & INIT_B(z, u, m)@q & not(#p = #q))
-        & not (Ex x y n l #i. DONE(x, y, n, n, l)@i)"
+    "Ex A B mx my #i #j.
+       Recv(A, B, mx)@i & Recv(B, A, my)@j
+       & not (A = B)
+       & not (Ex #k. Rev(A)@k) & not (Ex #k. Rev(B)@k)
+    "
        
+lemma injectiveAgreementI:
+  "All a b t #i.
+    Commit(a, b, <'I','R',t>)@i
+    ==> (Ex #j. Running(b, a,<'I', 'R', t>)@j
+             & not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>) @i2
+             & not (#i2 = #i)))
+           | (Ex X #r. Rev(X)@r & Honest(X)@i)"
 
-// Succeeds for I
-lemma injectiveAgreement_I:
-  "All a b t #i. 
-    Commit(a,b,<'I','R',t>) @i
-    ==> (Ex #j. Running(b,a,<'I','R',t>) @j 
-        & not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>) @i2
-                           & not (#i2 = #i)))
-              | (Ex X #r. Rev(X)@r & Honest(X) @i)"
-// Succeeds for R
-lemma injectiveAgreement_R:
-   "All a b t #i. 
-    Commit(a,b,<'R','I',t>) @i
-    ==> (Ex #j. Running(b,a,<'R','I',t>) @j 
-        & not (Ex a2 b2 #i2. Commit(a2,b2,<'R','I',t>) @i2
-                           & not (#i2 = #i)))
-              | (Ex X #r. Rev(X)@r & Honest(X) @i)"
-// prove secrecy of Kab
-lemma secrecy:
-  "All A x #i. 
-    Secret(A,x) @i ==> 
+ lemma injectiveAgreementR:
+  "All a b t #i.
+    Commit(a, b, <'R','I',t>)@i
+    ==> (Ex #j. Running(b, a,<'R', 'I', t>)@j
+          & not (Ex a2 b2 #i2. Commit(a2,b2,<'R','I',t>) @i2
+          & not (#i2 = #i)))
+        | (Ex X #r. Rev(X)@r & Honest(X)@i)"
+  
+  lemma secrecy:
+  "All A x #i.
+    Secret(A,x) @i ==>
     not (Ex #j. K(x)@j)
         | (Ex X #r. Rev(X)@r & Honest(X) @i)"
 end
