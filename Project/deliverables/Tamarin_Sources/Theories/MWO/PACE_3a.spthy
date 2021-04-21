@@ -1,4 +1,4 @@
-theory PACE_3
+theory PACE_3a
 begin
 
 functions: mac/2, kdf/3
