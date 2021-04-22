@@ -5,7 +5,7 @@ functions: mac/2
 
 /*
 1. A -> B: x
-2. B -> A: [x]k(A,B)
+2. B -> A: [x]_k(A,B)
 */
 
 // Shared key infrastructure rules

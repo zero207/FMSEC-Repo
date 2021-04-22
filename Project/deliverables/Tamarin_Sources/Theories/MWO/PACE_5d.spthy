@@ -5,10 +5,10 @@ builtins: symmetric-encryption, diffie-hellman
 functions: mac/2, h/1, map/2
 
 /*
-1. A -> B: g^x, p, {s}h(k(A,B))
+1. A -> B: g^x, p, {s}_h(k(A,B))
 2. B -> A: g^y
-3. A -> B: [g^y](h(g^xy)
-4. B -> A: [g^x](h(g^xy)
+3. A -> B: [g^y]_(h(g^xy)
+4. B -> A: [g^x]_(h(g^xy)
 */
 
 // Shared key infrastructure rules
@@ -66,13 +66,12 @@ rule B_2_send:
     [ Fr(~y)
     , St_B_2(B, id, A, kAB, X, p, s) ]
     --[ Send(B, A, g ^~y)
-       , Neq(X, g^~y) ]->
+       , Neq(X, g^y) ]->
     [ St_B_3(B, id, A, kAB, X, p, s, ~y)
     , Out(g^~y) ]
 
 //A receives message Y
 rule A_2_receive:
-    let g = map(s, p) in
     [ St_A_2(A, id, B, kAB, p, x, s)
     , In(Y) ]
     --[ Recv(A, B, Y)

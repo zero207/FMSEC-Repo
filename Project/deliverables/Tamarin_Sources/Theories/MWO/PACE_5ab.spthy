@@ -7,8 +7,8 @@ functions: mac/2, h/1, map/2
 /*
 1. A -> B: g^x, p, {s}h(k(A,B))
 2. B -> A: g^y
-3. A -> B: ['A', g^y](h(g^xy)
-4. B -> A: ['B', g^x](h(g^xy)
+3. A -> B: ['A', g^y]_(h(g^xy)
+4. B -> A: ['B', g^x]_(h(g^xy)
 */
 
 // Shared key infrastructure rules

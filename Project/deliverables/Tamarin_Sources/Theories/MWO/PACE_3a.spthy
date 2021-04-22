@@ -6,8 +6,8 @@ functions: mac/2, kdf/3
 /*
 1. A -> B: x
 2. B -> A: y
-3. A -> B: ['A', y]kdf(k(A,B), x, y)
-4. B -> A: ['B', x]kdf(k(A,B), x, y)
+3. A -> B: ['A', y]_kdf(k(A,B), x, y)
+4. B -> A: ['B', x]_kdf(k(A,B), x, y)
 */
 
 // Shared key infrastructure rules
