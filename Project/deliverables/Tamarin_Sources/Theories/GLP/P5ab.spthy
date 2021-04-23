@@ -1,15 +1,15 @@
 theory P5ab
 /*
 Extent the process of sending x with the high-entropy nonce s
-A -> B: g^x, p, {s{h(k(A,B))}}K(a,b)
+A -> B: g^x, p, {s}h(k(A.B))
 B -> A: g^y
-A -> B: ['A',g^y]_g^xy
-B -> A: ['B',g^x]_g^yx
+A -> B: ['A',g^y]_h(g^xy)
+B -> A: ['B',g^x]_h(g^yx)
 */
 begin
 
 builtins: hashing, symmetric-encryption, diffie-hellman
-functions: map/2
+functions: mac/2,map/2
 
 rule Generate_shared_Key:
   [ Fr(~shared_kAB)]
@@ -33,7 +33,7 @@ rule Init_A:
   [Fr(~id) 
   ,!Ltk(A, B, shared_kAB) ]
   --[ Create_A(A, ~id, 'roleA') ]->
-  [ St_A_0(A, B, ~id, shared_kAB) ]
+  [ St_A_0(A, B, ~id, shared_kAB, $p) ]
 
 // Initialize  responder B
 rule Init_B:
@@ -42,102 +42,100 @@ rule Init_B:
   --[ Create_B(B, ~id, 'roleB') ]->
   [ St_B_0(B, A, ~id, shared_kAB) ]
 
-// Generate A's DHF key and nonce s - Use ltk as the hash of the shared_pw. Send g^x and s encrypted with ltk and p
+// A sends message 'msg' using DFHK
 rule A_0:
   let
-    g = map(~s, ~p)
-    msg = <g^~x, senc(~s, h(shared_kAB)), ~p>
+    g = map(~s, p)
+    msg = <g^~x, p, senc(~s, h(shared_kAB))>
   in
   [ Fr(~x)
   , Fr(~s)
-  , Fr(~p)
-  , St_A_0(A, B, id, shared_kAB) ]
-  --[ Send(A, B, msg) ]->
-  [ Out(msg)
-  , St_A_1(A, B, id, ~x, ~s, ~p, shared_kAB) ]
+  , St_A_0(A, B, id, shared_kAB, p) ]
+  --[ Send(A, B, <g^~x, p, senc(~s, h(shared_kAB))>) ]->
+  [ Out(<g^~x, p, senc(~s, h(shared_kAB))>)
+  , St_A_1(A, B, id, p, ~x, ~s, shared_kAB) ]
 
-// A receives B's DHKey g^y
+// A receives B's y using DFHK
 rule A_1:
-    let
-      g = map(s,p)
-    in
-  [ St_A_1(A, B, id, x, s, p, shared_kAB)
-  ,In(gy) ]
-  --[Recv(A, B, gy) ]->
-  [ St_A_2(A, B, id, x, s, p, gy, shared_kAB) ]
+  [ St_A_1(A, B, id, p, x, s, shared_kAB)
+  ,In(Y) ]
+  --[Recv(A, B, Y) ]->
+  [ St_A_2(A, B, id, p, x, s, Y, shared_kAB) ]
 
-// A sends mac of g^y bound with identity 'A' generated using session key
+// A sends message my mac of <'A', Y> with session key Kab
  rule A_2:
     let 
       g = map(s,p)
-      K = h((gy)^x)
-      my = senc(<'A', gy>, K)  
+      Kab = h(Y^x)
+      mY = mac(<'A', Y>, Kab)
     in
-   [ St_A_2(A, B, id, p, x, s, gy, shared_kAB) ]
-   --[Send(A, B, my)
-   , Running(A,B,<'R','I',g^x ,gy> )]->
-   [Out(my)
-   ,St_A_3(A, B, id, p, x, s, gy, shared_kAB)  ] 
+   [ St_A_2(A, B, id, p, x, s, Y, shared_kAB) ]
+   --[Send(A, B, mY)
+   , Running(A,B,<'R','I',g^x ,Y> )]->
+   [Out(mY)
+   ,St_A_3(A, B, id, p, x, s, Y, shared_kAB)  ] 
 
-// A receives mac of g^x bound with identity 'B' generated using session key
+// A receives message mx --> mac of <'B', X> with session key Kab
 rule A_3:
   let
     g = map(s,p) 
-    K = h((gy)^x)
-    mx = senc(<'B',g^x>, K) 
+    Kab = h(Y^x)
+    mX = mac(<'B',g^x>, Kab) 
   in
-  [ In(mx)
-  , St_A_3(A, B, id, p, x, s, gy, shared_kAB) ]
-  --[ Recv(A, B, mx)
-    , Commit(A, B, <'I','R', g^x, gy>)
+  [ In(mX)
+  , St_A_3(A, B, id, p, x, s, Y, shared_kAB) ]
+  --[ Recv(A, B, mX)
+    , Commit(A, B, <'I','R', g^x, Y>)
     , Secret(A, Kab)
     , Honest(A)
     , Honest(B) ]->
   []
 
-// Generate message y
+// B receives message from A
 rule B_0:
-  [ Fr(~y)
-  ,St_B_0(B, A, id, shared_kAB) ]
-  --[Send(B, A, ~y) ]->
-  [ St_B_1(B, A, id, ~y, shared_kAB) ]
+  [ St_B_0(B, A, id, shared_kAB)
+  , In(<X, p, senc(s, h(shared_kAB))>) ]
+  --[ Recv(B, A, <X, p, senc(s, h(shared_kAB))>) ]->
+  [ St_B_1(B, A, id, X, p, s, shared_kAB) ]
 
-// B receives message x
+// B sends message g^y
 rule B_1:
-    let
-      msg = <x, senc(s, h(shared_kAB))>
-    in
-  [ St_B_1(B, A, id, y, shared_kAB)
-  , In(msg) ]
-  --[ Recv(B, A, msg) ]->
-  [ St_B_2(B, A, id, x, y, s, shared_kAB) ]
-
-// B sends message mx (MAC of x)
-rule B_2:
-  let 
-    Kab = kdf(s, x, y)
-    mx = mac(Kab,<'B', x>) 
-  in
-  [ St_B_2(B, A, id, x, y, s, shared_kAB) ]
-  --[ Send(B, A, mx)
-  , Running(B, A, <'I','R', x, y>) ]->
-  [ Out(mx)
-  , St_B_3(B, A, id, x, y, s, shared_kAB) ]
-
-// B receives MAC of y -> my
-rule B_3:
   let
-    Kab = kdf(shared_kAB, x, y)
-    my = mac(Kab,<'A', y>)
+    g = map(s, p)
   in
-  [ St_B_3(B, A, id, x, y, s, shared_kAB)
-  ,In(my) ]
-  --[ Recv(B, A, my)
-  , Commit(B,A, <'R','I', x, y>) 
+  [ Fr(~y)
+  ,St_B_1(B, A, id, X, p, s, shared_kAB) ]
+  --[Send(B, A, g^~y) ]->
+  [ St_B_2(B, A, id, X, p, s, ~y, shared_kAB) ]
+
+
+  // B receives MAC of y -> mY
+rule B_2:
+  let
+    g = map(s, p)
+    Kab = h(X^y)
+    mY = mac(Kab,<'A', g^y>)
+  in
+  [ St_B_2(B, A, id, p, X, s, y, shared_kAB)
+  , In(mY) ]
+  --[ Recv(B, A, mY)
+  , Commit(B, A, <'R','I', X, g^y>)  ]->
+  [St_B_3(B, A, id, X, p, s, y, shared_kAB) ]
+
+// B sends message mX (MAC of x)
+rule B_3:
+  let 
+    g = map(p, s)
+    Kab = h(X^y)
+    mX = mac(Kab,<'B', X>) 
+  in
+  [ St_B_3(B, A, id, X, p, s, y, shared_kAB) ]
+  --[ Send(B, A, mX)
+  , Running(B, A, <'I','R', X, g^y>)
   , Secret(B, Kab)
   , Honest(A)
   , Honest(B) ]->
-  [ ]
+  [ Out(mX) ]
 
 // Lemmas
 
@@ -149,26 +147,32 @@ lemma executable:
        & not (A = B)
        & not (Ex #k. Rev(A)@k) & not (Ex #k. Rev(B)@k)
     "
-       
-lemma injectiveAgreementI:
+
+lemma injectiveAgreementInitiator:
   "All a b t #i.
     Commit(a, b, <'I','R',t>)@i
     ==> (Ex #j. Running(b, a,<'I', 'R', t>)@j
              & not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>) @i2
              & not (#i2 = #i)))
-           | (Ex X #r. Rev(X)@r & Honest(X)@i)"
+           | (Ex X #r. Rev(X)@r)"
 
- lemma injectiveAgreementR:
+lemma injectiveAgreementResponder:
   "All a b t #i.
     Commit(a, b, <'R','I',t>)@i
     ==> (Ex #j. Running(b, a,<'R', 'I', t>)@j
           & not (Ex a2 b2 #i2. Commit(a2,b2,<'R','I',t>) @i2
           & not (#i2 = #i)))
-        | (Ex X #r. Rev(X)@r & Honest(X)@i)"
-  
-  lemma secrecy:
+        | (Ex X #r. Rev(X)@r)"
+
+lemma secrecy:
   "All A x #i.
     Secret(A,x) @i ==>
     not (Ex #j. K(x)@j)
         | (Ex X #r. Rev(X)@r & Honest(X) @i)"
+
+lemma forward_secrecy:
+  "All A x #i.
+    Secret(A,x) @i ==>
+    not (Ex #j. K(x)@j)
+        | (Ex X #r. Rev(X)@r & Honest(X) @i & r < i)"
 end
