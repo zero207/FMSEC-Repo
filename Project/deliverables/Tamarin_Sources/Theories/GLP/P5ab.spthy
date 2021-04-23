@@ -9,7 +9,7 @@ B -> A: ['B',g^x]_g^yx
 begin
 
 builtins: hashing, symmetric-encryption, diffie-hellman
-functions: map
+functions: map/2
 
 rule Generate_shared_Key:
   [ Fr(~shared_kAB)]
@@ -71,7 +71,7 @@ rule A_1:
     let 
       g = map(s,p)
       K = h((gy)^x)
-      my = senc(<'A', gy>), K)  
+      my = senc(<'A', gy>, K)  
     in
    [ St_A_2(A, B, id, p, x, s, gy, shared_kAB) ]
    --[Send(A, B, my)

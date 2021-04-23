@@ -4,7 +4,7 @@ The following MAC-based challenge response protocol has to be  defined
 A -> B: x
 B -> A: y
 A -> B: ['A',y]_kdf(k(a,b), x, y)
-B -> A: ['B',x]_kdf(k(a,b), x, §)
+B -> A: ['B',x]_kdf(k(a,b), x, y)
 */
 begin
 

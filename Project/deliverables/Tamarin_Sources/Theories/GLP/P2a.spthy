@@ -72,7 +72,7 @@ rule A_1:
 // A receives mac(x)_k(a,b) -> mx
 rule A_3:
   let 
-    mx = mac(x, shared_kBA) 
+    mx = mac(x, shared_kAB) 
   in
   [ In(mx)
   , St_A_3(A, B, id, x, y, shared_kAB, shared_kBA) ]
