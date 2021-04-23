@@ -1,0 +1,173 @@
+theory PACE_5d
+begin
+
+builtins: symmetric-encryption, diffie-hellman
+functions: mac/2, h/1, map/2
+
+/*
+1. A -> B: g^x, p, {s}_h(k(A,B))
+2. B -> A: g^y
+3. A -> B: [g^y]_(h(g^xy)
+4. B -> A: [g^x]_(h(g^xy)
+*/
+
+// Shared key infrastructure rules
+
+rule Register_shared_key:
+    [ Fr(~kAB) ]
+    -->
+    [ !LtMac($A, $B, ~kAB) ]
+
+rule Reveal_shk_A:
+    [ !LtMac(A, B, kAB) ]
+    --[ Rev(A) ]->
+    [ Out(kAB) ]
+
+  rule Reveal_shk_B:
+    [ !LtMac(A, B, kAB) ]
+    --[ Rev(B) ]->
+    [ Out(kAB) ]
+
+// Initialisation rules
+
+//Initialise A
+rule Initialise_A:
+    [ Fr(~id), !LtMac(A, B, kAB) ]
+    --[ Create_A(A, ~id, 'roleA') ]->
+    [ St_A_1(A, ~id, B, kAB, $p) ]
+
+//Initialise B
+rule Initialise_B:
+    [ Fr(~id), !LtMac(A, B, kAB) ]
+    --[ Create_B(B, ~id, 'roleB') ]->
+    [ St_B_1(B, ~id, A, kAB) ]
+
+// Protocol rules
+
+//A sends message <g^x, p, senc(s, h(kAB))>
+rule A_1_send:
+    let g = map(~s, p) in
+    [ Fr(~x), Fr(~s)
+    , St_A_1(A, id, B, kAB, p) ]
+    --[ Send(A, B, <g^~x, p, senc(~s, h(kAB))>) ]->
+    [ St_A_2(A, id, B, kAB, p, ~x, ~s)
+    , Out(<g^~x, p, senc(~s, h(kAB))>) ]
+
+//B receives message <X, p, senc(s, h(kAB))>
+rule B_1_receive:
+    [ St_B_1(B, id, A, kAB)
+    , In(<X, p, senc(s, h(kAB))>) ]
+    --[ Recv(B, A, <X, p, senc(s, h(kAB))>)]->
+    [ St_B_2(B, id, A, kAB, X, p, s) ]
+
+//B sends message g^y
+rule B_2_send:
+    let g = map(s, p) in
+    [ Fr(~y)
+    , St_B_2(B, id, A, kAB, X, p, s) ]
+    --[ Send(B, A, g ^~y)
+       , Neq(X, g^y) ]->
+    [ St_B_3(B, id, A, kAB, X, p, s, ~y)
+    , Out(g^~y) ]
+
+//A receives message Y
+rule A_2_receive:
+    [ St_A_2(A, id, B, kAB, p, x, s)
+    , In(Y) ]
+    --[ Recv(A, B, Y)
+       , Neq(g^x, Y) ]->
+    [ St_A_3(A, id, B, kAB, p, x, s, Y) ]
+
+//A sends message mY (MAC of Y with session key)
+rule A_3_send:
+    let g = map(s, p)
+         Kab = h(Y^x) //Kab is the session key
+         mY = mac(Kab, Y) in
+    [ St_A_3(A, id, B, kAB, p, x, s, Y) ]
+    --[ Send(A, B,  mY)
+    , Running(A, B, <'R', 'I', g^x, Y>) ]->
+    [ St_A_4(A, id, B, kAB, p, x, s, Y), Out(mY) ]
+
+//B receives message mY (MAC of Y with session key)
+rule B_3_receive:
+    let g = map(s, p)
+         Kab = h(X^y)
+         mY = mac(Kab, g^y) in
+    [ St_B_3(B, id, A, kAB, X, p, s, y)
+    , In(mY) ]
+    --[ Recv(B, A,  mY)
+      , Commit(B, A, <'R', 'I', X, g^y>) ]->
+    [ St_B_4(B, id, A, kAB, X, p, s, y) ]
+
+//B sends message mX (MAC of X with session key)
+rule B_4_send:
+    let g = map(s, p)
+         Kab = h(X^y) //Kab is the session key
+         mX = mac(Kab, X) in
+    [ St_B_4(B, id, A, kAB, X, p, s, y) ]
+    --[ Send(B, A,  mX)
+    , Running(B, A, <'I', 'R', X, g^y>)
+    , Secret(B, Kab)
+    , Honest(A)
+    , Honest(B) ]->
+    [ St_B_5(B, id, A, kAB, X, p, s, y), Out(mX) ]
+
+//A receives message mX (MAC of X with session key)
+rule A_4_receive:
+    let g = map(s, p)
+         Kab = h(Y^x)
+         mX = mac(Kab, g^x) in
+    [ St_A_4(A, id, B, kAB, p, x, s, Y)
+    , In(mX) ]
+    --[ Recv(A, B,  mX)
+      , Commit(A, B, <'I', 'R', g^x, Y>)
+      , Secret(A, Kab)
+      , Honest(A)
+      , Honest(B) ]->
+    [ St_A_5(A, id, B, kAB, p, x, s, Y) ]
+
+
+// Lemmas
+
+restriction Inequality:
+"All x #i. Neq(x,x) @ #i ==> F"
+
+// succeeds
+lemma executable:
+  exists-trace
+    "Ex A B mx my #i #j.
+       Recv(A, B, mx)@i & Recv(B, A, my)@j
+       & not (A = B)
+       & not (Ex #k. Rev(A)@k) & not (Ex #k. Rev(B)@k)
+    "
+
+lemma injectiveAgreementInitiator:
+  "All a b t #i.
+    Commit(a, b, <'I','R',t>)@i
+    ==> (Ex #j. Running(b, a,<'I', 'R', t>)@j
+             & not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>) @i2
+             & not (#i2 = #i)))
+           | (Ex X #r. Rev(X)@r)"
+
+lemma injectiveAgreementResponder:
+  "All a b t #i.
+    Commit(a, b, <'R','I',t>)@i
+    ==> (Ex #j. Running(b, a,<'R', 'I', t>)@j
+          & not (Ex a2 b2 #i2. Commit(a2,b2,<'R','I',t>) @i2
+          & not (#i2 = #i)))
+        | (Ex X #r. Rev(X)@r)"
+
+lemma secrecy:
+  "All A x #i.
+    Secret(A,x) @i ==>
+    not (Ex #j. K(x)@j)
+        | (Ex X #r. Rev(X)@r & Honest(X) @i)"
+
+lemma forward_secrecy:
+  "All A x #i.
+    Secret(A,x) @i ==>
+    not (Ex #j. K(x)@j)
+        | (Ex X #r. Rev(X)@r & Honest(X) @i & r < i)"
+
+
+end

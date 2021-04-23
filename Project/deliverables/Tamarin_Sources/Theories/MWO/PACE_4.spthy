@@ -5,10 +5,10 @@ builtins: symmetric-encryption
 functions: mac/2, kdf/3, h/1
 
 /*
-1. A -> B: x, {s}h(k(A,B))
+1. A -> B: x, {s}_h(k(A,B))
 2. B -> A: y
-3. A -> B: ['A', y]kdf(s, x, y)
-4. B -> A: ['B', x]kdf(s, x, y)
+3. A -> B: ['A', y]_kdf(s, x, y)
+4. B -> A: ['B', x]_kdf(s, x, y)
 */
 
 // Shared key infrastructure rules
