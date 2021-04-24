@@ -1,4 +1,4 @@
-theory P5d
+theory P5ab
 /*
 Extent the process of sending x with the high-entropy nonce s
 A -> B: g^x, p, {s}h(k(A.B))
@@ -51,17 +51,15 @@ rule A_0:
   , Fr(~s)
   , St_A_0(A, B, id, shared_kAB, p) ]
   --[ Send(A, B, <g^~x, p, senc(~s, h(shared_kAB))>) ]->
-  [St_A_1(A, B, id, p, ~x, ~s, shared_kAB) 
-  , Out(<g^~x, p, senc(~s, h(shared_kAB))>) ]
+  [ Out(<g^~x, p, senc(~s, h(shared_kAB))>)
+  , St_A_1(A, B, id, p, ~x, ~s, shared_kAB) ]
 
 // A receives B's Y
 rule A_1:
   [ St_A_1(A, B, id, p, x, s, shared_kAB)
   ,In(Y) ]
-  --[Recv(A, B, Y) 
-  , Neq(g^x, Y)]->
+  --[Recv(A, B, Y) ]->
   [ St_A_2(A, B, id, p, x, s, Y, shared_kAB) ]
-
 
 // A sends message mY mac of Y with session key Kab
  rule A_2:
@@ -106,10 +104,10 @@ rule B_1:
   in
   [ Fr(~y)
   ,St_B_1(B, A, id, X, p, s, shared_kAB) ]
-  --[Send(B, A, g^~y)
-  , Neq(X, g^~y) ]->
+  --[Send(B, A, g^~y) ]->
   [ St_B_2(B, A, id, X, p, s, ~y, shared_kAB)
   , Out(g^~y) ]
+
 
   // B receives MAC of y -> mY
 rule B_2:
@@ -139,9 +137,6 @@ rule B_3:
   , Honest(B) ]->
   [ Out(mX) ]
 
-// Ensures that g^x != g^y
-restriction InEquality:
-"All x #i. Neq(x,x) @ #i ==> F"
 
 // Lemmas
 

@@ -3,8 +3,8 @@ theory P5ab
 Extent the process of sending x with the high-entropy nonce s
 A -> B: g^x, p, {s}h(k(A.B))
 B -> A: g^y
-A -> B: ['A',g^y]_h(g^xy)
-B -> A: ['B',g^x]_h(g^yx)
+A -> B: [g^y]_h(g^xy)
+B -> A: [g^x]_h(g^yx)
 */
 begin
 
@@ -42,11 +42,10 @@ rule Init_B:
   --[ Create_B(B, ~id, 'roleB') ]->
   [ St_B_0(B, A, ~id, shared_kAB) ]
 
-// A sends message 'msg' using DFHK
+// A sends message using DFHK
 rule A_0:
   let
     g = map(~s, p)
-    msg = <g^~x, p, senc(~s, h(shared_kAB))>
   in
   [ Fr(~x)
   , Fr(~s)
@@ -106,7 +105,8 @@ rule B_1:
   [ Fr(~y)
   ,St_B_1(B, A, id, X, p, s, shared_kAB) ]
   --[Send(B, A, g^~y) ]->
-  [ St_B_2(B, A, id, X, p, s, ~y, shared_kAB) ]
+  [ St_B_2(B, A, id, X, p, s, ~y, shared_kAB)
+  , Out(g^~y) ]
 
 
   // B receives MAC of y -> mY
@@ -147,7 +147,7 @@ lemma executable:
        & not (A = B)
        & not (Ex #k. Rev(A)@k) & not (Ex #k. Rev(B)@k)
     "
-
+// succeeds
 lemma injectiveAgreementInitiator:
   "All a b t #i.
     Commit(a, b, <'I','R',t>)@i
@@ -155,7 +155,7 @@ lemma injectiveAgreementInitiator:
              & not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>) @i2
              & not (#i2 = #i)))
            | (Ex X #r. Rev(X)@r)"
-
+// succeeds
 lemma injectiveAgreementResponder:
   "All a b t #i.
     Commit(a, b, <'R','I',t>)@i
@@ -163,13 +163,13 @@ lemma injectiveAgreementResponder:
           & not (Ex a2 b2 #i2. Commit(a2,b2,<'R','I',t>) @i2
           & not (#i2 = #i)))
         | (Ex X #r. Rev(X)@r)"
-
+// succeeds
 lemma secrecy:
   "All A x #i.
     Secret(A,x) @i ==>
     not (Ex #j. K(x)@j)
         | (Ex X #r. Rev(X)@r & Honest(X) @i)"
-
+// succeeds
 lemma forward_secrecy:
   "All A x #i.
     Secret(A,x) @i ==>
