@@ -1,0 +1,101 @@
+theory OTR1
+/*
+Adapted protocol from paper
+ A -> B : signing(g^x, sk(A)), pk(A)
+ B -> A : signing(g^y, sk(B)), pk(B)
+*/
+builtins: signing, diffie-hellman
+
+begin
+
+// Symmetric key infrastructure
+
+rule Register_ltk_A:
+  [ Fr(~k) ]
+  --[ Create($A) ]->
+  [ !Ltk($A, ~k), !Pk($A, pk(~k)) ]
+
+rule Get_pk:
+  [ !Pk(A, p) ]
+  -->
+  [ Out(p) ]
+
+rule Reveal_ltk:
+  [ !Ltk(A, k) ]
+  --[ Reveal(A) ]->
+  [ Out(k) ]
+
+// Initialize initiator A   
+
+rule Init_A:
+  [Fr(~id) 
+  ,!Ltk(A, B, k) ]
+  --[ Create_A(A, ~id,'roleA') ]->
+  [ St_A_0(A, ~id, B, k) ]
+
+// Sign and send DFHK before sending it to B
+
+rule A_0:
+    [ Fr(~x)
+    ,St_A_0(A, id, B, k, x) ]
+    --[Send(A, B, <g^~x,sign(g^~x, k), pk(k)>)]->
+    [ St_A_1(A, id, B, k, ~x)
+    , Out(<g^~x,<sign(g^~x, k)>, pk(k)>) ]
+
+// Receive and verify B's key
+
+rule A_1:
+    [ St_A_1(A, id, B,  k, x]
+    , !Pk(B, pk(l)
+    , In(<g^y, sig, pk(l)>)
+    --[ Recv(B, id, A, g^y, sig, pk(l))
+    , Eq(verify(sig, g^y, pk(l)), true)
+    , Commit(A, B, <'A', 'B', g^y>
+    , Honest(A)
+    , Honest(B) ]->
+    [ St_A_3(A, id, B, k, x, g^y, pk(l)) ]
+
+// Initialize  responder B
+rule Init_B:
+  [Fr(~id) 
+  ,!Ltk(B, l) ]
+  --[ Create_B(B, ~id, 'roleB') ]->
+  [ St_B_0(B, ~id, A, l) ]
+
+// Receive and verify A's key
+
+rule B_0:
+    [St_B_0(B, id, A, l)
+    , !Pk(A, pk(k))
+    , In(<g^x, sig, pk(k)>) ]
+    --[ Recv(B, id, A, g^x, sig, pk(k))
+    , Eq(verify(sig, g^x, pk(k)), true) ]->
+    [ St_B_1(B, A, id, l, g^x, pk(k)) ]
+
+// Sign and send DFHK before sending it to A
+
+rule B_1:
+    [ Fr(~y)
+    , St_B_1(B, id, A, l, g^x, pk(k)) ]
+    --[Send(B, A, <g^~y,sign(g^~y, l), pk(l)>)
+    , Running(B, A, <'A', 'B', g^~y>)
+    , Honest(B)
+    , Honest(A)]->
+    [St_B_2(B, id, l, ~y, g^x, pk(k)) 
+    , Out(<g^~y,sign(g^~y, l), pk(l)>) ]
+
+// Lemmas
+
+// succeeds
+lemma executable:
+  exists-trace
+    "Ex A B k l x y msg #j #p #q.
+         DONE(A, B, k, l, x, y)@j
+       & not (k = l)
+       & not (A = B)
+       & not (x = y)
+       & IN_A_2(A, B, msg)@p & OUT_B_2(B, A, msg)@q
+       & not (Ex #k. Reveal(A)@k) & not (Ex #k. Reveal(B)@k)
+       & not (Ex x y z u l m #p #q. INIT_A(x, y, l)@p & INIT_A(z, u, m)@q & not(#p = #q))
+       & not (Ex x y z u l m #p #q. INIT_B(x, y, l)@p & INIT_B(z, u, m)@q & not(#p = #q))"
+end
