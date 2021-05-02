@@ -1,8 +1,8 @@
 theory OTR1
 /*
 Adapted protocol from paper
- A -> B : g^x, sign(g^x, sk(A)), pk(A)
- B -> A : g^y, sign(g^y, sk(B)), pk(B)
+ A -> B : g^x, sign(g^x, sk(A), pk(A)
+ B -> A : g^y, sign(g^y, sk(B), pk(B)
 */
 
 begin
@@ -33,7 +33,7 @@ rule Init_A:
   --[ INIT_A(A, $B, k) ]->
   [ St_A_0(A, ~id, $B, k) ]
 
-// Sign and send DFHK before sending it to B
+// Sign DFHK before sending it to B
 
 rule A_0:
   let
@@ -42,8 +42,8 @@ rule A_0:
     [ Fr(~x)
     ,St_A_0(A, id, B, k) ]
     --[Send(A, B, msg)]->
-    [ St_A_1(A, id, B, k, ~x)
-    , Out(msg) ]
+    [ Out(msg)
+    , St_A_1(A, id, B, k, ~x) ]
 
 // Receive and verify B's key
 
@@ -55,8 +55,9 @@ rule A_1:
     , !Pk(B, pk(l))
     , In(msg) ]
     --[ Recv(A, B, msg)
-    , Eq(verify( sign( 'g'^y, l),'g'^y, pk(l)),true)
-    , Authentic(B, 'g'^y)
+    , Commit(A, B, <'I','R','g'^y>)
+    //, Eq(verify( sign( 'g'^y, l),'g'^y, pk(l)),true)
+    //, Authentic(B, 'g'^y)
     , Honest(A)
     , Honest(B) ]->
     [ St_A_2(A, id, B, k, x, 'g'^y, pk(l)) ]
@@ -72,7 +73,7 @@ rule Init_B:
 
 rule B_0:
   let
-    msg = <'g'^x,sign('g'^x, k), pk(k)>
+    msg = <'g'^x, sign('g'^x, k), pk(k)>
   in
     [St_B_0(B, id, A, l)
     , !Pk(A, pk(k))
@@ -82,7 +83,7 @@ rule B_0:
     //, Authentic(A, 'g'^x) ]->
     [ St_B_1(B, id, A, l, 'g'^x, pk(k)) ]
 
-// Sign and send DFHK before sending it to A
+// Sign DFHK before sending it to A
 
 rule B_1:
   let
@@ -91,11 +92,12 @@ rule B_1:
     [ Fr(~y)
     , St_B_1(B, id, A, l, 'g'^x, pk(k)) ]
     --[Send(B, A, msg)
-    , Running(B, A, <'A', 'B', 'g'^~y>)
+    , Running(B, A, <'I', 'R', 'g'^~y>)
     , Honest(B)
     , Honest(A)]->
-    [St_B_2(B, id, A, l, ~y, 'g'^x, pk(k)) 
-    , Out(msg) ]
+    [Out(msg)
+    , St_B_2(B, id, A, l, ~y, 'g'^x, pk(k)) 
+     ]
 
 //Done
 rule Done:
