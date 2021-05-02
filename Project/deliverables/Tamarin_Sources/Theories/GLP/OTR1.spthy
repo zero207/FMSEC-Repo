@@ -77,7 +77,7 @@ rule B_0:
     , !Pk(A, pk(k))
     , In(msg) ]
     --[ Recv(B, A, msg) ]->
-    [ St_B_1(B, A, id, l, 'g'^x, pk(k)) ]
+    [ St_B_1(B, id, A, l, 'g'^x, pk(k)) ]
 
 // Sign and send DFHK before sending it to A
 
@@ -91,13 +91,13 @@ rule B_1:
     , Running(B, A, <'A', 'B', 'g'^~y>)
     , Honest(B)
     , Honest(A)]->
-    [St_B_2(B, id, l, ~y, 'g'^x, pk(k)) 
+    [St_B_2(B, id, A, l, ~y, 'g'^x, pk(k)) 
     , Out(msg) ]
 
 //Done
 rule Done:
-  [ St_A_3(A, B, k, x, gy, pkl)
-  , St_B_3(B, A, l, y, gx, pkk) ]
+  [ St_A_2(A, id, B, k, x, gy, pkl)
+  , St_B_2(B, id, A, l, y, gx, pkk) ]
   --[ DONE(A, B, k, l, x, y) ]->
   []
 
@@ -107,7 +107,7 @@ rule Done:
 lemma executable:
   exists-trace
     "Ex A B k l x y msg #j #p #q.
-        DONE(A, B, k, l, x, y)@j
+         DONE(A, B, k, l, x, y)@j
        & not (k = l)
        & not (A = B)
        & not (x = y)
