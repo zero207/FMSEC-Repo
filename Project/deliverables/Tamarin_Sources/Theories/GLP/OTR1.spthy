@@ -1,8 +1,8 @@
 theory OTR1
 /*
 Adapted protocol from paper
- A -> B : g^x, sign(g^x, sk(A), pk(A)
- B -> A : g^y, sign(g^y, sk(B), pk(B)
+ A -> B : g^x, sign(g^x, sk(A)), pk(A)
+ B -> A : g^y, sign(g^y, sk(B)), pk(B)
 */
 
 begin
@@ -22,7 +22,7 @@ rule Get_pk:
 
 rule Reveal_ltk:
   [ !Ltk(A, k) ]
-  --[ Reveal(A) ]->
+  --[ Rev(A) ]->
   [ Out(k) ]
 
 // Initialize initiator A   
@@ -117,7 +117,7 @@ lemma executable:
        & not (A = B)
        & not (x = y)
        & Recv(A, B, msg)@p & Send(B, A, msg)@q
-       & not (Ex #k. Reveal(A)@k) & not (Ex #k. Reveal(B)@k)
+       & not (Ex #k. Rev(A)@k) & not (Ex #k. Rev(B)@k)
        & not (Ex x y z u l m #p #q. INIT_A(x, y, l)@p & INIT_A(z, u, m)@q & not(#p = #q))
        & not (Ex x y z u l m #p #q. INIT_B(x, y, l)@p & INIT_B(z, u, m)@q & not(#p = #q))
     "
