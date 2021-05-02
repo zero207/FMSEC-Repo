@@ -55,7 +55,8 @@ rule A_1:
     , !Pk(B, pk(l))
     , In(msg) ]
     --[ Recv(A, B, msg)
-    , Commit(A, B, <'I', 'R', 'g'^y>)
+    , Eq(verify( sign( 'g'^y, l),'g'^y, pk(l)),true)
+    , Authentic(B, 'g'^y)
     , Honest(A)
     , Honest(B) ]->
     [ St_A_2(A, id, B, k, x, 'g'^y, pk(l)) ]
@@ -77,6 +78,8 @@ rule B_0:
     , !Pk(A, pk(k))
     , In(msg) ]
     --[ Recv(B, A, msg) ]->
+    //, Eq(verify(sign('g'^x, k),'g'^x, pk(k)),true)
+    //, Authentic(A, 'g'^x) ]->
     [ St_B_1(B, id, A, l, 'g'^x, pk(k)) ]
 
 // Sign and send DFHK before sending it to A
