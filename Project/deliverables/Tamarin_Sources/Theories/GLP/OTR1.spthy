@@ -1,8 +1,8 @@
 theory OTR1
 /*
 Adapted protocol from paper
- A -> B : signing(g^x, sk(A)), pk(A)
- B -> A : signing(g^y, sk(B)), pk(B)
+ A -> B : g^x, sign(g^x, sk(A)), pk(A)
+ B -> A : g^y, sign(g^y, sk(B)), pk(B)
 */
 
 begin
@@ -10,7 +10,7 @@ begin
 builtins: signing, diffie-hellman
 // Symmetric key infrastructure
 
-rule Register_ltk_A:
+rule Reg_ltk:
   [ Fr(~k) ]
   --[ Create($A) ]->
   [ !Ltk($A, ~k), !Pk($A, pk(~k)) ]
@@ -29,18 +29,18 @@ rule Reveal_ltk:
 
 rule Init_A:
   [Fr(~id) 
-  ,!Ltk(A, B, k) ]
-  --[ Create_A(A, ~id,'roleA') ]->
-  [ St_A_0(A, ~id, B, k) ]
+  ,!Ltk(A, k) ]
+  --[ INIT_A(A, $B, k) ]->
+  [ St_A_0(A, ~id, $B, k) ]
 
 // Sign and send DFHK before sending it to B
 
 rule A_0:
   let
-    msg = <g^~x,sign(g^~x, k), pk(k)>
+    msg = <'g'^~x,sign('g'^~x, k), pk(k)>
   in
     [ Fr(~x)
-    ,St_A_0(A, id, B, k, x) ]
+    ,St_A_0(A, id, B, k) ]
     --[Send(A, B, msg)]->
     [ St_A_1(A, id, B, k, ~x)
     , Out(msg) ]
@@ -49,49 +49,49 @@ rule A_0:
 
 rule A_1:
   let
-    msg = <g^y,sign(g^y, l), pk(l)>
+    msg = <'g'^y,sign('g'^y, l), pk(l)>
   in
     [ St_A_1(A, id, B,  k, x)
     , !Pk(B, pk(l))
     , In(msg) ]
-    --[ Recv(B, id, A, msg)
-    , Commit(A, B, <'A', 'B', g^y>)
+    --[ Recv(A, B, msg)
+    , Commit(A, B, <'I', 'R', 'g'^y>)
     , Honest(A)
     , Honest(B) ]->
-    [ St_A_2(A, id, B, k, x, g^y, pk(l)) ]
+    [ St_A_2(A, id, B, k, x, 'g'^y, pk(l)) ]
 
 // Initialize  responder B
 rule Init_B:
   [Fr(~id) 
   ,!Ltk(B, l) ]
-  --[ Create_B(B, ~id, 'roleB') ]->
-  [ St_B_0(B, ~id, A, l) ]
+  --[ INIT_B(B, $A, l) ]->
+  [ St_B_0(B, ~id, $A, l) ]
 
 // Receive and verify A's key
 
 rule B_0:
   let
-    msg = <g^x,sign(g^x, k), pk(k)>
+    msg = <'g'^x,sign('g'^x, k), pk(k)>
   in
     [St_B_0(B, id, A, l)
     , !Pk(A, pk(k))
     , In(msg) ]
-    --[ Recv(B, id, A, msg) ]->
-    [ St_B_1(B, A, id, l, g^x, pk(k)) ]
+    --[ Recv(B, A, msg) ]->
+    [ St_B_1(B, A, id, l, 'g'^x, pk(k)) ]
 
 // Sign and send DFHK before sending it to A
 
 rule B_1:
   let
-    msg = <g^~y,sign(g^~y, l), pk(l)>
+    msg = <'g'^~y,sign('g'^~y, l), pk(l)>
   in
     [ Fr(~y)
-    , St_B_1(B, id, A, l, g^x, pk(k)) ]
+    , St_B_1(B, id, A, l, 'g'^x, pk(k)) ]
     --[Send(B, A, msg)
-    , Running(B, A, <'A', 'B', g^~y>)
+    , Running(B, A, <'A', 'B', 'g'^~y>)
     , Honest(B)
     , Honest(A)]->
-    [St_B_2(B, id, l, ~y, g^x, pk(k)) 
+    [St_B_2(B, id, l, ~y, 'g'^x, pk(k)) 
     , Out(msg) ]
 
 //Done
@@ -114,5 +114,6 @@ lemma executable:
        & Recv(A, B, msg)@p & Send(B, A, msg)@q
        & not (Ex #k. Reveal(A)@k) & not (Ex #k. Reveal(B)@k)
        & not (Ex x y z u l m #p #q. INIT_A(x, y, l)@p & INIT_A(z, u, m)@q & not(#p = #q))
-       & not (Ex x y z u l m #p #q. INIT_B(x, y, l)@p & INIT_B(z, u, m)@q & not(#p = #q))"
+       & not (Ex x y z u l m #p #q. INIT_B(x, y, l)@p & INIT_B(z, u, m)@q & not(#p = #q))
+    "
 end
