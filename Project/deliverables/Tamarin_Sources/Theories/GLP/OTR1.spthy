@@ -4,10 +4,10 @@ Adapted protocol from paper
  A -> B : signing(g^x, sk(A)), pk(A)
  B -> A : signing(g^y, sk(B)), pk(B)
 */
-builtins: signing, diffie-hellman
 
 begin
 
+builtins: signing, diffie-hellman
 // Symmetric key infrastructure
 
 rule Register_ltk_A:
@@ -36,24 +36,29 @@ rule Init_A:
 // Sign and send DFHK before sending it to B
 
 rule A_0:
+  let
+    msg = <g^~x,sign(g^~x, k), pk(k)>
+  in
     [ Fr(~x)
     ,St_A_0(A, id, B, k, x) ]
-    --[Send(A, B, <g^~x,sign(g^~x, k), pk(k)>)]->
+    --[Send(A, B, msg)]->
     [ St_A_1(A, id, B, k, ~x)
-    , Out(<g^~x,<sign(g^~x, k)>, pk(k)>) ]
+    , Out(msg) ]
 
 // Receive and verify B's key
 
 rule A_1:
-    [ St_A_1(A, id, B,  k, x]
-    , !Pk(B, pk(l)
-    , In(<g^y, sig, pk(l)>)
-    --[ Recv(B, id, A, g^y, sig, pk(l))
-    , Eq(verify(sig, g^y, pk(l)), true)
-    , Commit(A, B, <'A', 'B', g^y>
+  let
+    msg = <g^y,sign(g^y, l), pk(l)>
+  in
+    [ St_A_1(A, id, B,  k, x)
+    , !Pk(B, pk(l))
+    , In(msg) ]
+    --[ Recv(B, id, A, msg)
+    , Commit(A, B, <'A', 'B', g^y>)
     , Honest(A)
     , Honest(B) ]->
-    [ St_A_3(A, id, B, k, x, g^y, pk(l)) ]
+    [ St_A_2(A, id, B, k, x, g^y, pk(l)) ]
 
 // Initialize  responder B
 rule Init_B:
@@ -65,24 +70,36 @@ rule Init_B:
 // Receive and verify A's key
 
 rule B_0:
+  let
+    msg = <g^x,sign(g^x, k), pk(k)>
+  in
     [St_B_0(B, id, A, l)
     , !Pk(A, pk(k))
-    , In(<g^x, sig, pk(k)>) ]
-    --[ Recv(B, id, A, g^x, sig, pk(k))
-    , Eq(verify(sig, g^x, pk(k)), true) ]->
+    , In(msg) ]
+    --[ Recv(B, id, A, msg) ]->
     [ St_B_1(B, A, id, l, g^x, pk(k)) ]
 
 // Sign and send DFHK before sending it to A
 
 rule B_1:
+  let
+    msg = <g^~y,sign(g^~y, l), pk(l)>
+  in
     [ Fr(~y)
     , St_B_1(B, id, A, l, g^x, pk(k)) ]
-    --[Send(B, A, <g^~y,sign(g^~y, l), pk(l)>)
+    --[Send(B, A, msg)
     , Running(B, A, <'A', 'B', g^~y>)
     , Honest(B)
     , Honest(A)]->
     [St_B_2(B, id, l, ~y, g^x, pk(k)) 
-    , Out(<g^~y,sign(g^~y, l), pk(l)>) ]
+    , Out(msg) ]
+
+//Done
+rule Done:
+  [ St_A_3(A, B, k, x, gy, pkl)
+  , St_B_3(B, A, l, y, gx, pkk) ]
+  --[ DONE(A, B, k, l, x, y) ]->
+  []
 
 // Lemmas
 
@@ -90,11 +107,11 @@ rule B_1:
 lemma executable:
   exists-trace
     "Ex A B k l x y msg #j #p #q.
-         DONE(A, B, k, l, x, y)@j
+        DONE(A, B, k, l, x, y)@j
        & not (k = l)
        & not (A = B)
        & not (x = y)
-       & IN_A_2(A, B, msg)@p & OUT_B_2(B, A, msg)@q
+       & Recv(A, B, msg)@p & Send(B, A, msg)@q
        & not (Ex #k. Reveal(A)@k) & not (Ex #k. Reveal(B)@k)
        & not (Ex x y z u l m #p #q. INIT_A(x, y, l)@p & INIT_A(z, u, m)@q & not(#p = #q))
        & not (Ex x y z u l m #p #q. INIT_B(x, y, l)@p & INIT_B(z, u, m)@q & not(#p = #q))"
