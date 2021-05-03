@@ -1,0 +1,176 @@
+theory OTR1
+begin
+
+builtins: signing, diffie-hellman
+
+/*
+1. A -> B: g^x, {g^x}_sk(A), pk(A)
+2. B -> A: g^y, {g^y }_sk(B), pk(B)
+*/
+
+// Public key infrastructure
+
+rule Reg_ltk:
+  [ Fr(~sk) ]
+  -->
+  [ !Ltk($A, ~sk), !Pk($A, pk(~sk)), Out(pk(~sk)) ]
+
+rule Reveal_ltk:
+  [ !Ltk(A, k) ]
+  --[ Rev(A) ]->
+  [ Out(k) ]
+
+// Initalisation rules
+
+//Initialise A
+rule Initialise_A:
+  [ Fr(~id), !Ltk(A, skA) ]
+  --[ Create_A(A, ~id) ]->
+  [ St_A_1(A, ~id, $B, skA) ]
+
+//Initialise B
+rule Initialise_B:
+  [ Fr(~id), !Ltk(B, skB) ]
+  --[ Create_B(B, ~id) ]->
+  [ St_B_1(B, ~id, $A, skB) ]
+
+
+// Protocol
+
+//A sends g^x and its public key to B
+rule A_1_send:
+  let msg = <'g'^~x, sign{'g'^~x}skA, pk(skA)> in
+  [ Fr(~x)
+  , St_A_1(A, id, B, skA) ]
+  --[ Send(A, B, msg)
+  , Running(A, B, <'R', 'I', 'g'^~x, pk(skA)>) ]->
+  [ St_A_2(A, id, B, skA, ~x), Out(msg) ]
+
+//B sends g^y and its public key to A
+rule B_1_send:
+  let msg = <'g'^~y, sign{'g'^~y}skB, pk(skB)> in
+  [ Fr(~y)
+  , St_B_1(B, id, A, skB) ]
+  --[ Send(B, A, msg)
+  , Running(B, A, <'I', 'R', 'g'^~y, pk(skB)>) ]->
+  [ St_B_2(B, id, A, skB, ~y), Out(msg) ]
+
+/* A receives message containing a signed value
+    and a public key */
+rule A_2_receive:
+  let msg = <Y, sign{Y}skB, pk(skB)>
+    Kab = Y^x in
+  [  St_A_2(A, id, B, skA, x)
+  , In(msg) ]
+  --[ Recv(A, B, msg)
+  , Commit(A, B, <'I', 'R', Y, pk(skB)>)
+  , Neq('g'^x, Y)
+  , Secret(A, Kab)
+  , Honest(A)
+  , Honest(B) ]->
+  [ St_A_3(A, id, B, skA, x, Y, pk(skB)) ]
+
+  /* B receives message containing a signed value
+      and a public key */
+rule B_2_receive:
+  let msg = <X, sign{X}skA, pk(skA)>
+       Kab = X^y in
+  [ St_B_2(B, id, A, skB, y)
+  , In(msg) ]
+  --[ Recv(B, A, msg)
+  , Commit(B, A, <'R', 'I', X, pk(skA)>)
+  , Neq(X, 'g'^y)
+  , Secret(B, Kab)
+  , Honest(A)
+  , Honest(B) ]->
+  [ St_B_3(B, id, A, skB, y, X, pk(skB)) ]
+
+
+// Lemmas
+
+// succeeds
+lemma executable:
+  exists-trace
+    "Ex A B mx1 my1 mx2 my2 #i #j #k #l.
+       Recv(A, B, mx1)@i & Send(B, A, my1)@j & j<i
+       & Recv(B, A, my2)@k & Send(A, B, mx2)@l & l<k
+       & not (A = B)
+//       & not ( mx = my)
+       & not (Ex Name1 Id1 Name2 Id2 #i #j. Create_A(Name1, Id1) @i & Create_A(Name2, Id2) @j & not(#i = #j))
+       & not (Ex Name1 Id1 Name2 Id2 #i #j. Create_B(Name1, Id1) @i & Create_B(Name2, Id2) @j & not(#i = #j))
+       & not (Ex #k. Rev(A)@k) & not (Ex #k. Rev(B)@k)
+    "
+
+
+//  fails
+lemma NonInjectiveAgreementInitiator:
+    "All A B t #i.
+     Commit(A, B, <'I', 'R', t>)@i
+     ==> (Ex #j. Running(B, A,<'I', 'R', t>)@j)
+                | (Ex X #r. Rev(X)@r)"
+
+/*
+lemma InjectiveAgreementInitiator:
+    "All a b t #i.
+     Commit(a, b, <'I', 'R', t>)@i
+     ==> (Ex #j. Running(b, a,<'I', 'R', t>)@j
+     & not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>) @i2
+     & not (#i2 = #i)))
+
+          | (Ex X #r. Rev(X)@r)"
+
+lemma injectiveAgreementResponder:
+    "All a b t #i.
+      Commit(a, b, <'R','I',t>)@i
+      ==> (Ex #j. Running(b, a,<'R', 'I', t>)@j
+              & not (Ex a2 b2 #i2. Commit(a2,b2,<'R','I',t>) @i2
+              & not (#i2 = #i)))
+          | (Ex X #r. Rev(X)@r)"
+
+lemma secrecy:
+    "All A x #i.
+      Secret(A,x) @i ==>
+      not (Ex #j. K(x)@j)
+          | (Ex X #r. Rev(X)@r & Honest(X) @i)"
+
+lemma forward_secrecy:
+    "All A x #i.
+      Secret(A,x) @i ==>
+      not (Ex #j. K(x)@j)
+          | (Ex X #r. Rev(X)@r & Honest(X) @i & r < i)"
+
+
+// This restriction enforces that only traces containing at most 1
+// Create_A are considered. If (as here) an attack is
+// still found, this is good, and the resulting attack much smaller.
+restriction two_A_at_least:
+    "All Name1 Id1 Name2 Id2 #i #j. Create_A(Name1, Id1) @i & Create_A(Name2, Id2) @j ==> not(#i = #j)"
+*/
+restriction Inequality:
+    "All x #i. Neq(x,x) @ #i ==> F"
+
+// This restriction enforces that only traces containing at most 1
+// Create_A are considered. If (as here) an attack is
+// still found, this is good, and the resulting attack much smaller.
+
+// restriction two_A_at_least:
+//   "All Name1 Id1 Name2 Id2 #i #j. Create_A(Name1, Id1) @i & Create_A(Name2, Id2) @j ==> not(#i = #j)"
+
+// Same for Create_B
+restriction one_B_at_most:
+  "All Name1 Id1 Name2 Id2 #i #j. Create_B(Name1, Id1) @i & Create_B(Name2, Id2) @j ==> #i = #j"
+
+
+
+/*
+restriction Send_before_Receive:
+"All A B mx #i.
+    Recv(A, B, mx)@i
+    ==> (Ex my #j. Send(B, A, my)@j & j<i
+             & not(A = B))"
+
+
+
+*/
+
+end
