@@ -52,7 +52,7 @@ rule A_0:
 rule B_0:
   [ St_B_0(B, A, id, shared_kAB)
   , In(x) ]
-  --[ Recv(B, A, x) ]->
+  --[ Recv_B_0(B, A, x) ]->
   [ St_B_1(B, A, id, x, shared_kAB) ]
 
 // B sends message m (MAC of x)
@@ -61,7 +61,7 @@ rule B_1:
     m = mac(x, shared_kAB) 
   in
   [ St_B_1(B, A, id, x, shared_kAB) ]
-  --[ Send(B, A, m) 
+  --[ Send_B_1(B, A, m) 
   , Running(B,A,<'A','B',m>)
   , Honest(A)
   , Honest(B)]->
@@ -74,7 +74,7 @@ rule A_1:
   in
   [ In(m)
   , St_A_1(A, B, id, x, shared_kAB) ]
-  --[ Recv(A, B, m)
+  --[ Recv_A_1(A, B, m)
     , Commit(A, B, <'A','B',m>)
     , Honest(A)
     , Honest(B) ]->
@@ -86,7 +86,7 @@ rule A_1:
 lemma executable:
   exists-trace
     "Ex A B m #i.
-       Recv(A, B, m)@i
+       Recv_A_1(A, B, m)@i
        & not (A = B)
        & not (Ex #k. Rev(A)@k) & not (Ex #k. Rev(B)@k)"
 
