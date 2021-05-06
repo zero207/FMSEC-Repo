@@ -28,10 +28,10 @@ rule Reveal_ltk:
 // Initialize initiator A   
 
 rule Init_A:
-  [Fr(~id) 
+  [Fr(~idA) 
   ,!Ltk(A, k) ]
   --[ INIT_A(A, $B, k) ]->
-  [ St_A_0(A, ~id, $B, k) ]
+  [ St_A_0(A, ~idA, $B, k) ]
 
 // Sign DFHK before sending it to B
 
@@ -40,10 +40,10 @@ rule A_0:
     msg = <'g'^~x,sign('g'^~x, k), pk(k)>
   in
     [ Fr(~x)
-    ,St_A_0(A, id, B, k) ]
+    ,St_A_0(A, idA, B, k) ]
     --[Send(A, B, msg)]->
     [ Out(msg)
-    , St_A_1(A, id, B, k, ~x) ]
+    , St_A_1(A, idA, B, k, ~x) ]
 
 // Receive and verify B's key
 
@@ -51,23 +51,23 @@ rule A_1:
   let
     msg = <'g'^y,sign('g'^y, l), pk(l)>
   in
-    [ St_A_1(A, id, B,  k, x)
+    [ St_A_1(A, idA, B,  k, x)
     , !Pk(B, pk(l))
     , In(msg) ]
     --[ Recv(A, B, msg)
     , Commit(A, B, <'I','R','g'^y>)
-    //, Eq(verify( sign( 'g'^y, l),'g'^y, pk(l)),true)
-    //, Authentic(B, 'g'^y)
+    , Eq(verify( sign( 'g'^y, l),'g'^y, pk(l)),true)
+    , Authentic(B, 'g'^y)
     , Honest(A)
     , Honest(B) ]->
-    [ St_A_2(A, id, B, k, x, 'g'^y, pk(l)) ]
+    [ St_A_2(A, idA, B, k, x, 'g'^y, pk(l)) ]
 
 // Initialize  responder B
 rule Init_B:
-  [Fr(~id) 
+  [Fr(~idB) 
   ,!Ltk(B, l) ]
   --[ INIT_B(B, $A, l) ]->
-  [ St_B_0(B, ~id, $A, l) ]
+  [ St_B_0(B, ~idB, $A, l) ]
 
 // Receive and verify A's key
 
@@ -75,13 +75,13 @@ rule B_0:
   let
     msg = <'g'^x, sign('g'^x, k), pk(k)>
   in
-    [St_B_0(B, id, A, l)
+    [St_B_0(B, idB, A, l)
     , !Pk(A, pk(k))
     , In(msg) ]
-    --[ Recv(B, A, msg) ]->
-    //, Eq(verify(sign('g'^x, k),'g'^x, pk(k)),true)
-    //, Authentic(A, 'g'^x) ]->
-    [ St_B_1(B, id, A, l, 'g'^x, pk(k)) ]
+    --[ Recv(B, A, msg)
+    , Eq(verify(sign('g'^x, k),'g'^x, pk(k)),true)
+    , Authentic(A, 'g'^x) ]->
+    [ St_B_1(B, idB, A, l, 'g'^x, pk(k)) ]
 
 // Sign DFHK before sending it to A
 
@@ -90,19 +90,19 @@ rule B_1:
     msg = <'g'^~y,sign('g'^~y, l), pk(l)>
   in
     [ Fr(~y)
-    , St_B_1(B, id, A, l, 'g'^x, pk(k)) ]
+    , St_B_1(B, idB, A, l, 'g'^x, pk(k)) ]
     --[Send(B, A, msg)
     , Running(B, A, <'I', 'R', 'g'^~y>)
     , Honest(B)
     , Honest(A)]->
     [Out(msg)
-    , St_B_2(B, id, A, l, ~y, 'g'^x, pk(k)) 
+    , St_B_2(B, idB, A, l, ~y, 'g'^x, pk(k)) 
      ]
 
 //Done
 rule Done:
-  [ St_A_2(A, id, B, k, x, gy, pkl)
-  , St_B_2(B, id, A, l, y, gx, pkk) ]
+  [ St_A_2(A, idA, B, k, x, gy, pkl)
+  , St_B_2(B, idB, A, l, y, gx, pkk) ]
   --[ DONE(A, B, k, l, x, y) ]->
   []
 
