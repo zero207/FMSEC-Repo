@@ -1,0 +1,151 @@
+theory OTR3
+/*
+Adapted protocol from paper
+ A -> B : g^x, sign(<g^x, B>, sk(A)), pk(A)
+ B -> A : g^y, sign(<g^y, A>, sk(B)), pk(B)
+*/
+
+begin
+
+builtins: signing, diffie-hellman
+// Symmetric key infrastructure
+
+rule Reg_ltk:
+  [ Fr(~k) ]
+  --[ Create($A) ]->
+  [ !Ltk($A, ~k), !Pk($A, pk(~k)) ]
+
+rule Reveal_ltk:
+  [ !Ltk(A, k) ]
+  --[ Rev(A) ]->
+  [ Out(k) ]
+
+// Initialize initiator A   
+
+rule Init_A:
+  [Fr(~idA) 
+  ,!Ltk(A, k) ]
+  --[ INIT_A(A, $B, k) ]->
+  [ St_A_0(A, ~idA, $B, k) ]
+
+// Send key to B
+
+rule A_0:
+  let
+    msg = <'g'^~x,sign(<'g'^~x, B>, k), pk(k)>
+  in
+    [ Fr(~x)
+    ,St_A_0(A, idA, B, k) ]
+    --[Send(A, B, msg)]->
+    [ Out(msg)
+    , St_A_1(A, idA, B, k, ~x) ]
+
+// Receive B's key
+
+rule A_1:
+  let
+    msg = <'g'^y,sign(<'g'^y, A>, l), pk(l)>
+  in
+    [ St_A_1(A, idA, B,  k, x)
+    , !Pk(B, pk(l))
+    , In(msg) ]
+    --[ Recv(A, B, msg)
+    , Commit(A, B, <'I','R','g'^y>)
+    , Eq(verify( sign( <'g'^y, A>, l),'g'^y, pk(l)),true)
+    , Authentic(B, 'g'^y)
+    , Honest(A)
+    , Honest(B) ]->
+    [ St_A_2(A, idA, B, k, x, 'g'^y, pk(l)) ]
+
+// Initialize  responder B
+rule Init_B:
+  [Fr(~idB) 
+  ,!Ltk(B, l) ]
+  --[ INIT_B(B, $A, l) ]->
+  [ St_B_0(B, ~idB, $A, l) ]
+
+// Receive and verify A's key
+
+rule B_0:
+  let
+    msg = <'g'^x, sign(<'g'^x, B>, k), pk(k)>
+  in
+    [St_B_0(B, idB, A, l)
+    , !Pk(A, pk(k))
+    , In(msg) ]
+    --[ Recv(B, A, msg)
+    , Eq(verify(sign(<'g'^x, B>, k),'g'^x, pk(k)),true)
+    , Authentic(A, 'g'^x) ]->
+    [ St_B_1(B, idB, A, l, 'g'^x, pk(k)) ]
+
+// Sign DFHK before sending it to A
+
+rule B_1:
+  let
+    msg = <'g'^~y,sign(<'g'^~y, A>, l), pk(l)>
+  in
+    [ Fr(~y)
+    , St_B_1(B, idB, A, l, 'g'^x, pk(k)) ]
+    --[Send(B, A, msg)
+    , Running(B, A, <'I', 'R', 'g'^~y>)
+    , Honest(B)
+    , Honest(A)]->
+    [Out(msg)
+    , St_B_2(B, idB, A, l, ~y, 'g'^x, pk(k)) 
+     ]
+
+//Done
+rule Done:
+  [ St_A_2(A, idA, B, k, x, gy, pkl)
+  , St_B_2(B, idB, A, l, y, gx, pkk) ]
+  --[ DONE(A, B, k, l, x, y) ]->
+  []
+
+// Lemmas
+
+// succeeds
+lemma executable:
+  exists-trace
+    "Ex A B k l x y msg #j #p #q.
+         DONE(A, B, k, l, x, y)@j
+       & not (k = l)
+       & not (A = B)
+       & not (x = y)
+       & Recv(A, B, msg)@p & Send(B, A, msg)@q
+       & not (Ex #k. Rev(A)@k) & not (Ex #k. Rev(B)@k)
+       & not (Ex x y z u l m #p #q. INIT_A(x, y, l)@p & INIT_A(z, u, m)@q & not(#p = #q))
+       & not (Ex x y z u l m #p #q. INIT_B(x, y, l)@p & INIT_B(z, u, m)@q & not(#p = #q))
+    "
+// fails
+lemma noninjectiveagreementINITIATOR:
+  "All a b t #i.
+    (Commit(a,b,<'I','R',t>) @i
+    & not (Ex x y z l m #p #q. INIT_A(x, y, l)@p & INIT_A(x, z, m)@q & not(#p = #q))
+    & not (Ex x y z l m #p #q. INIT_B(x, y, l)@p & INIT_B(x, z, m)@q & not(#p = #q))
+    & not (a = b))
+    ==> (Ex #j. Running(b,a,<'I','R',t>) @j)
+      | (Ex X #r. Rev(X)@r & Honest(X) @i)"
+
+// succeeds
+lemma noninjectiveagreementRESPONDER:
+  "All a b t #i.
+    (Commit(a,b,<'R','I',t>) @i
+    & not (Ex x y z u l m #p #q. INIT_A(x, y, l)@p & INIT_A(z, u, m)@q & not(#p = #q))
+    & not (Ex x y z l m #p #q. INIT_B(x, y, l)@p & INIT_B(x, z, m)@q & not(#p = #q))
+    & not (Ex x #p #q. Create(x)@p & Create(x)@q & not(#p = #q))
+    & not (a = b))
+     ==> (Ex #j. Running(b,a,<'R','I',t>) @j)
+       | (Ex X #r. Rev(X)@r & Honest(X) @i)"
+
+// succeeds
+lemma noninjectiveagreementOLD:
+  "All a b t #i.
+     (Commit(a,b,<'I','R',t>) @i
+     & not (Ex x y u v l #p #q. Send(x, y, l)@p & Recv(u, v, l)@q)
+     & not (Ex x y u v l m n o #p #q. Send(x, y, <l,m>)@p & Send(u, v, <n,o>)@q & not(#p = #q) & not(n = l))
+     & not (Ex x y z k #p #q.   INIT_A(x, y, k)@p & INIT_B(x, z, k)@q & not(#p = #q))
+     & not (Ex x y z k l #p #q. INIT_B(x, y, k)@p & INIT_B(x, z, l)@q & not(#p = #q))
+     & not (a = b))
+     ==> (Ex #j. Running(b,a,<'I','R',t>) @j)
+       | (Ex X #r. Rev(X)@r)"
+end
