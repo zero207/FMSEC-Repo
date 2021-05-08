@@ -8,7 +8,7 @@ theory OTR4
 
 begin
 
-builtins: signing, diffie-hellman, hashing, asymmetric-encryption
+builtins: signing, diffie-hellman, hashing
 functions: mac/2
 // Symmetric key infrastructure
 
