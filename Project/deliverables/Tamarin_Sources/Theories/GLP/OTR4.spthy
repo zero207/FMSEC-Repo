@@ -1,8 +1,9 @@
 theory OTR4
 /*
-Adapted protocol from paper
- A -> B : g^x, sign(g^x, sk(A)), pk(A)
- B -> A : g^y, sign(g^y, sk(B)), pk(B)
+1. A -> B: g^x
+2. B -> A: g^y
+3. A -> B: A, sign{g^y, g^x}pk(k),pk(k),mac(h(g^y^x), <'I',A>), pk(k)
+4. B -> A: B, sign{g^y, g^x}pk(l),pk(k),mac(h(g^x^y), <'F',B>), pk(k)
 */
 
 begin
@@ -27,94 +28,111 @@ rule Init_A:
   [Fr(~idA) 
   ,!Ltk(A, k) ]
   --[ INIT_A(A, $B, k) ]->
-  [ St_A_0(A, ~idA, $B, k) ]
+  [ St_A_0(A, $B, ~idA, k) ]
 
 // Send DFHK to B
 
 rule A_0:
     [ Fr(~x)
-    ,St_A_0(A, idA, B, k) ]
+    ,St_A_0(A, B, idA, k) ]
     --[Send(A, B, 'g'^~x)
     , Running(A, B, <'R', 'I', 'g'^~x>)
     , Honest(A)
     , Honest(B)]->
     [ Out('g'^~x)
-    , St_A_1(A, idA, B, k, ~x) ]
+    , St_A_1(A, B, idA, k, ~x) ]
 
 // Receive B's key
 
 rule A_1:
-  [ St_A_1(A, B, k, x)
+  [ St_A_1(A, B, idA, k, x)
   , In('g'^y) ]
   --[ Recv(A, B, 'g'^y) ]->
-  [ St_A_2(A, B, k, x, 'g'^y) ]
+  [ St_A_2(A, B, idA, k, x, 'g'^y) ]
 
 // Send signed and MACed secret to B  
 
 rule A_2:
   let
-    msg = <A, sign(<'g'^y, 'g'^x>, pk(k)), mac(h('g'^xy), <'I', A>), pk(k)>
+    msg = <A, sign(<'g'^y, 'g'^x>, pk(k)), mac(h('g'^y^x), <'I', A>), pk(k)>
   in
-    [ St_A_2(A, idA, B,  k, x, 'g'^y) ]
-    --[ Send(A, B, msg) ]->
-    [ St_A_3(A, idA, B, k, x, 'g'^y) ]
+    [ St_A_2(A, B, idA,  k, x, 'g'^y) ]
+    --[ Send(A, B, msg)
+    , Out(msg) ]->
+    [ St_A_3(A, B, idA, k, x, 'g'^y) ]
 
 //Receive B's signed and MACed secret
 
 rule A_3:
     let
-      msg = <B, sign(<'g'^x, 'g'^y>, pk(l)), mac(h('g'^xy), <'R', B>), pk(l)>
+      msg = <B, sign(<'g'^x, 'g'^y>, pk(l)), mac(h('g'^x^y), <'R', B>), pk(l)>
     in
-  [  St_A_3(A, idA, B, k, x, 'g'^y)
+  [  St_A_3(A, B, idA, k, x, 'g'^y)
   , In(msg)
   , !Pk(B, pk(l))]
   --[ Recv(A, B, msg)
   , Commit(A, B, <'I', 'R', 'g'^y>)
   , Honest(A)
   , Honest(B) ]->
-  [ St_A_4(A, B, k, x, 'g'^y, pk(l)) ]
+  [ St_A_4(A, B, idA, k, x, 'g'^y, pk(l)) ]
 
-// Initialize  responder B --> Hier fortsetzen
+// Initialize  responder B
 rule Init_B:
   [Fr(~idB) 
   ,!Ltk(B, l) ]
   --[ INIT_B(B, $A, l) ]->
-  [ St_B_0(B, ~idB, $A, l) ]
+  [ St_B_0(B, $A, ~idB, l) ]
 
-// Receive and verify A's key
+// Receive A's key
 
 rule B_0:
-  let
-    msg = <'g'^x, sign(<'g'^x, B>, k), pk(k)>
-  in
-    [St_B_0(B, idB, A, l)
-    , !Pk(A, pk(k))
-    , In(msg) ]
-    --[ Recv(B, A, msg)
-    , Eq(verify(sign(<'g'^x, B>, k),'g'^x, pk(k)),true)
-    , Authentic(A, 'g'^x) ]->
-    [ St_B_1(B, idB, A, l, 'g'^x, pk(k)) ]
+  [ St_B_0(B, A, idB, l)
+  , In('g'^x) ]
+  --[ Recv(B, A, 'g'^x) ]->
+  [ St_B_1(B, A, idB, l, 'g'^x) ]
 
-// Sign DFHK before sending it to A
+// Send key to A
 
-rule B_1:
-  let
-    msg = <'g'^~y,sign(<'g'^~y, A>, l), pk(l)>
-  in
-    [ Fr(~y)
-    , St_B_1(B, idB, A, l, 'g'^x, pk(k)) ]
-    --[Send(B, A, msg)
-    , Running(B, A, <'I', 'R', 'g'^~y>)
+ rule B_1:
+   [ Fr(~y)
+  , St_B_1(B, A, idB, l, 'g'^x) ]
+  --[ Send(B, A, 'g'^~y)
+    , Running(B, A, <'I','R','g'^~y>)
     , Honest(B)
-    , Honest(A)]->
-    [Out(msg)
-    , St_B_2(B, idB, A, l, ~y, 'g'^x, pk(k)) 
-     ]
+    , Honest(A) ]->
+  [ Out('g'^~y)
+  , St_B_2(B, A, idB, l, ~y, 'g'^x) ]
+
+// Receive A's message
+
+rule B_2:
+  let
+    msg = <A, sign(<'g'^y, 'g'^x>, pk(k)), mac(h('g'^y^x), <'I', A>), pk(k)>
+  in
+  [ St_B_2(B, A, idB, l, y, 'g'^x)
+  , In(msg)
+  , !Pk(A, pk(k)) ]
+  --[ Recv(B, A, msg)
+    , Commit(B, A, <'R','I','g'^x>)
+    , Honest(B)
+    , Honest(A) ]->
+  [ St_B_3(B, A, idB, l, y, 'g'^x, pk(k)) ]
+
+// Send message to A
+
+rule B_3:
+  let
+    msg = <B, sign(<'g'^x, 'g'^y>, pk(l)), mac(h('g'^x^y), <'R', B>), pk(l)>
+  in
+  [ St_B_3(B, A, idB, l, y, 'g'^x, pk(k)) ]
+  --[ Send(B, A, msg) ]->
+  [ Out(msg)
+  , St_B_4(B, A, idB, l, y, 'g'^x, pk(k)) ]
 
 //Done
 rule Done:
-  [ St_A_2(A, idA, B, k, x, gy, pkl)
-  , St_B_2(B, idB, A, l, y, gx, pkk) ]
+  [ St_A_4(A, B, idA, k, x, gy, pkl)
+  , St_B_4(B, A, idB, l, y, gx, pkk) ]
   --[ DONE(A, B, k, l, x, y) ]->
   []
 
