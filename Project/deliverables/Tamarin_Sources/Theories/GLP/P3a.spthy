@@ -11,7 +11,7 @@ begin
 functions: mac/2, kdf/3
 
 rule Generate_shared_Key:
-  [ Fr(~shared_kAB)]
+  [ Fr(~shared_kAB) ]
   -->
   [ !Ltk($A, $B, ~shared_kAB) ]
 
@@ -43,13 +43,21 @@ rule Init_B:
   --[ Create_B(B, ~id, 'roleB') ]->
   [ St_B_0(B, A, ~id, shared_kAB) ]
 
-// A sends nonce x as message
+// A sends message x
 rule A_0:
   [ Fr(~x)
   , St_A_0(A, B, id, shared_kAB) ]
   --[ Send(A, B, ~x) ]->
-  [ Out(~x)
-  , St_A_1(A, B, id, ~x, shared_kAB) ]
+  [ St_A_1(A, B, id, ~x, shared_kAB)
+  , Out(~x) ]
+
+// B sends message y
+rule B_0:
+  [ Fr(~y)
+  ,St_B_0(B, A, id, shared_kAB) ]
+  --[Send(B, A, ~y) ]->
+  [Out(~y) 
+  , St_B_1(B, A, id, ~y, shared_kAB) ]
 
 // A receives message y
 rule A_1:
@@ -58,40 +66,6 @@ rule A_1:
   --[Recv(A, B, y) ]->
   [ St_A_2(A, B, id, x, y, shared_kAB) ]
 
-// A sends mac(y)_k(a,b)
- rule A_2:
-    let 
-      Kab = kdf(shared_kAB, x, y)
-      my = mac(Kab,<'A', y>)  
-    in
-   [ St_A_2(A, B, id, x, y, shared_kAB) ]
-   --[Send(A, B, my)
-   , Running(A,B,<'R','I',x ,y> )]->
-   [Out(my)
-   ,St_A_3(A, B, id, x, y, shared_kAB)  ] 
-
-// A receives mac(x)_k(a,b) -> mx
-rule A_3:
-  let 
-    Kab = kdf(shared_kAB, x, y)
-    mx = mac(Kab,<'B',x>) 
-  in
-  [ In(mx)
-  , St_A_3(A, B, id, x, y, shared_kAB) ]
-  --[ Recv(A, B, mx)
-    , Commit(A, B, <'I','R', x, y>)
-    , Secret(A, Kab)
-    , Honest(A)
-    , Honest(B) ]->
-  []
-
-// Generate message y
-rule B_0:
-  [ Fr(~y)
-  ,St_B_0(B, A, id, shared_kAB) ]
-  --[Send(B, A, ~y) ]->
-  [ St_B_1(B, A, id, ~y, shared_kAB) ]
-
 // B receives message x
 rule B_1:
   [ St_B_1(B, A, id, y, shared_kAB)
@@ -99,40 +73,71 @@ rule B_1:
   --[ Recv(B, A, x) ]->
   [ St_B_2(B, A, id, x, y, shared_kAB) ]
 
+// A sends mac(y)_k(a,b)
+ rule A_2:
+    let
+      Kab = kdf(shared_kAB, x, y) 
+      my = mac(shared_kAB, <'A', y>)  
+    in
+   [ St_A_2(A, B, id, x, y, shared_kAB) ]
+   --[Send(A, B, my)
+   , Running(A ,B ,<'R','I',x ,y> )]->
+   [ St_A_3(A, B, id, x, y, shared_kAB)
+   , Out(my)  ] 
+
 // B sends message mx (MAC of x)
 rule B_2:
-  let 
-    Kab = kdf(shared_kAB, x, y)
-    mx = mac(Kab,<'B', x>) 
+  let
+    Kab = kdf(shared_kAB, x, y) 
+    mx = mac(Kab, <'B', x>) 
   in
   [ St_B_2(B, A, id, x, y, shared_kAB) ]
   --[ Send(B, A, mx)
-  , Running(B,A, <'I','R', x, y>) ]->
-  [ Out(mx)
-  , St_B_3(B, A, id, x, y, shared_kAB) ]
+  , Running(B ,A , <'I','R', x, y>) ]->
+  [ St_B_3(B, A, id, x, y, shared_kAB)
+  , Out(mx) ]
+
+// A receives MAC of x -> mx
+rule A_3:
+  let
+    Kab = kdf(shared_kAB, x, y) 
+    mx = mac(Kab, <'B', x>) 
+  in
+  [ In(mx)
+  , St_A_3(A, B, id, x, y, shared_kAB) ]
+  --[ Recv(A, B, mx)
+    , Commit(A, B, <'I', 'R', x, y>)
+    , Secret(A, Kab)
+    , Honest(A)
+    , Honest(B)
+    , Finish(A) ]->
+  [St_A_4(A, B, id, x, y, shared_kAB)]
 
 // B receives MAC of y -> my
 rule B_3:
   let
-    Kab = kdf(shared_kAB, x, y)
-    my = mac(Kab,<'A', y>)
+    Kab =  kdf(shared_kAB, x, y)
+    my = mac(Kab, <'A', y>)
   in
   [ St_B_3(B, A, id, x, y, shared_kAB)
   ,In(my) ]
-  --[ Recv(B,A,my)
+  --[ Recv(B ,A ,my)
   , Commit(B,A, <'R','I', x, y>) 
   , Secret(B, Kab)
   , Honest(A)
-  , Honest(B) ]->
-  [ ]
+  , Honest(B)
+  , Finish(B) ]->
+  [ St_B_4(B, A, id, x, y, shared_kAB)]
 
 // Lemmas
 
-// succeeds
+// it's executable
 lemma executable:
   exists-trace
-    "Ex A B mx my #i #j.
-       Recv(A, B, mx)@i & Recv(B, A, my)@j
+    "Ex A B  #i #j.
+       Finish(A)@i & Finish(B)@j
+       & not (Ex Name1 Id1 Name2 Id2 #i #j. Create_A(Name1, Id1, 'roleA') @i & Create_A(Name2, Id2, 'roleA') @j & not(#i = #j))
+       & not (Ex Name1 Id1 Name2 Id2 #i #j. Create_B(Name1, Id1, 'roleB') @i & Create_B(Name2, Id2, 'roleB') @j & not(#i = #j))
        & not (A = B)
        & not (Ex #k. Rev(A)@k) & not (Ex #k. Rev(B)@k)
     "
