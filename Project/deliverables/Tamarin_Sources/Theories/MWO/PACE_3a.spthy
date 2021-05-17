@@ -4,10 +4,10 @@ begin
 functions: mac/2, kdf/3
 
 /*
-1. A -> B: x
-2. B -> A: y
-3. A -> B: ['A', y]_kdf(k(A,B), x, y)
-4. B -> A: ['B', x]_kdf(k(A,B), x, y)
+1a. A -> B: x
+1b. B -> A: y
+2a. A -> B: ['A', y]_kdf(k(A,B), x, y)
+2b. B -> A: ['B', x]_kdf(k(A,B), x, y)
 */
 
 // Shared key infrastructure rules
@@ -101,7 +101,8 @@ rule A_4_receive:
       , Commit(A, B, <'I', 'R', x, y>)
       , Secret(A, Kab)
       , Honest(A)
-      , Honest(B) ]->
+      , Honest(B)
+      , Finish(A) ]->
     [ St_A_5(A, id, B, x, kAB, y) ]
 
 //B receives message my (MAC of <'A', y> with session key)
@@ -114,7 +115,8 @@ rule B_4_receive:
       , Commit(B, A, <'R', 'I', x, y>)
       , Secret(B, Kab)
       , Honest(A)
-      , Honest(B) ]->
+      , Honest(B)
+      , Finish(B) ]->
     [ St_B_5(B, id, A, y, kAB, x) ]
 
 
@@ -123,10 +125,12 @@ rule B_4_receive:
 // succeeds
 lemma executable:
   exists-trace
-    "Ex A B mx my #i #j.
-       Recv(A, B, mx)@i & Recv(B, A, my)@j
+    "Ex A B #i #j.
+       Finish(A)@i & Finish(B)@j
+       & not (Ex Name1 Id1 Name2 Id2 #i #j. Create_A(Name1, Id1, 'roleA') @i & Create_A(Name2, Id2, 'roleA') @j & not(#i = #j))
+       & not (Ex Name1 Id1 Name2 Id2 #i #j. Create_B(Name1, Id1, 'roleB') @i & Create_B(Name2, Id2, 'roleB') @j & not(#i = #j))
        & not (A = B)
-       & not (Ex #k. Rev(A)@k) & not (Ex #k. Rev(B)@k)
+       & not (Ex X #k. Rev(X)@k)
     "
 
 lemma injectiveAgreementInitiator:

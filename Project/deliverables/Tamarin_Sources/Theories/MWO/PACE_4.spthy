@@ -46,11 +46,12 @@ rule Initialise_B:
 
 //A sends message <x, senc(s, h(kAB))>
 rule A_1_send:
+    let msg = <~x, senc(~s, h(kAB))> in
     [ Fr(~x), Fr(~s)
     , St_A_1(A, id, B, kAB) ]
-    --[ Send(A, B, <~x, senc(~s, h(kAB))>) ]->
-    [ St_A_2(A, id, B, ~x, kAB, ~s)
-    , Out(<~x, senc(~s, h(kAB))>) ]
+    --[ Send(A, B, msg) ]->
+    [ St_A_2(A, id, B, ~x, ~s, kAB)
+    , Out(msg) ]
 
 //B sends message y
 rule B_1_send:
@@ -62,10 +63,10 @@ rule B_1_send:
 
 //A receives message y
 rule A_2_receive:
-    [ St_A_2(A, id, B, x, kAB, s)
+    [ St_A_2(A, id, B, x, s, kAB)
     , In(y) ]
     --[ Recv(A, B, y)]->
-    [ St_A_3(A, id, B, x, kAB, s, y) ]
+    [ St_A_3(A, id, B, x, s, kAB, y) ]
 
 //B receives message <x, senc(s, h(kAB))>
 rule B_2_receive:
@@ -77,16 +78,16 @@ rule B_2_receive:
 
 //A sends message my (MAC of <'A', y> with session key)
 rule A_3_send:
-    let Kab = kdf(s, x, y) //Kab is the session key
+    let Kab = kdf(s, x, y) // Kab is the session key
          my = mac(Kab, <'A', y>) in
-    [ St_A_3(A, id, B, x, kAB, s, y) ]
+    [ St_A_3(A, id, B, x, s, kAB, y) ]
     --[ Send(A, B,  my)
     , Running(A, B, <'R', 'I', x, y>) ]->
-    [ St_A_4(A, id, B, x, kAB, s, y), Out(my) ]
+    [ St_A_4(A, id, B, x, s, kAB, y), Out(my) ]
 
 //B sends message mx (MAC of <'B', x> with session key)
 rule B_3_send:
-    let Kab = kdf(s, x, y) //Kab is the session key
+    let Kab = kdf(s, x, y) // Kab is the session key
          mx = mac(Kab, <'B', x>) in
     [ St_B_3(B, id, A, y, kAB, x, s) ]
     --[ Send(B, A,  mx)
@@ -97,18 +98,19 @@ rule B_3_send:
 rule A_4_receive:
     let Kab = kdf(s, x, y)
          mx = mac(Kab, <'B', x>) in
-    [ St_A_4(A, id, B, x, kAB, s, y)
+    [ St_A_4(A, id, B, x, s, kAB, y)
     , In(mx) ]
     --[ Recv(A, B,  mx)
       , Commit(A, B, <'I', 'R', x, y>)
       , Secret(A, Kab)
       , Honest(A)
-      , Honest(B) ]->
-    [ St_A_5(A, id, B, x, kAB, s, y) ]
+      , Honest(B)
+      , Finish(A) ]->
+    [ St_A_5(A, id, B, x, s, kAB, y) ]
 
 //B receives message my (MAC of <'A', y> with session key)
 rule B_4_receive:
-    let Kab = kdf(kAB, x, y)
+    let Kab = kdf(s, x, y)
          my = mac(Kab, <'A', y>) in
     [ St_B_4(B, id, A, y, kAB, x, s)
     , In(my) ]
@@ -116,7 +118,8 @@ rule B_4_receive:
       , Commit(B, A, <'R', 'I', x, y>)
       , Secret(B, Kab)
       , Honest(A)
-      , Honest(B) ]->
+      , Honest(B)
+      , Finish(B) ]->
     [ St_B_5(B, id, A, y, kAB, x, s) ]
 
 
@@ -125,10 +128,12 @@ rule B_4_receive:
 // succeeds
 lemma executable:
   exists-trace
-    "Ex A B mx my #i #j.
-       Recv(A, B, mx)@i & Recv(B, A, my)@j
+    "Ex A B #i #j.
+       Finish(A)@i & Finish(B)@j
+       & not (Ex Name1 Id1 Name2 Id2 #i #j. Create_A(Name1, Id1, 'roleA') @i & Create_A(Name2, Id2, 'roleA') @j & not(#i = #j))
+       & not (Ex Name1 Id1 Name2 Id2 #i #j. Create_B(Name1, Id1, 'roleB') @i & Create_B(Name2, Id2, 'roleB') @j & not(#i = #j))
        & not (A = B)
-       & not (Ex #k. Rev(A)@k) & not (Ex #k. Rev(B)@k)
+       & not (Ex X #k. Rev(X)@k)
     "
 
 lemma injectiveAgreementInitiator:
