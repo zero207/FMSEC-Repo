@@ -1,4 +1,4 @@
-theory PACE_2a
+theory PACE_2a_seq
 begin
 
 functions: mac/2
