@@ -97,7 +97,8 @@ rule A_4_receive:
     --[ Recv(A, B,  mx)
       , Commit(A, B, <'I', 'R', x, y>)
       , Honest(A)
-      , Honest(B) ]->
+      , Honest(B)
+      , Finish(A) ]->
     [ St_A_5(A, id, B, x, kAB, kBA, y) ]
 
 //B receives message my (MAC of <'A', x, y> with kBA)
@@ -108,7 +109,8 @@ rule B_4_receive:
     --[ Recv(B, A,  my)
       , Commit(B, A, <'R', 'I', x, y>)
       , Honest(A)
-      , Honest(B) ]->
+      , Honest(B)
+      , Finish(B) ]->
     [ St_B_5(B, id, A, y, kAB, kBA, x) ]
 
 
@@ -117,10 +119,12 @@ rule B_4_receive:
 // succeeds
 lemma executable:
   exists-trace
-    "Ex A B mx my #i #j.
-       Recv(A, B, mx)@i & Recv(B, A, my)@j
+    "Ex A B #i #j.
+       Finish(A)@i & Finish(B)@j
+       & not (Ex Name1 Id1 Name2 Id2 #i #j. Create_A(Name1, Id1, 'roleA') @i & Create_A(Name2, Id2, 'roleA') @j & not(#i = #j))
+       & not (Ex Name1 Id1 Name2 Id2 #i #j. Create_B(Name1, Id1, 'roleB') @i & Create_B(Name2, Id2, 'roleB') @j & not(#i = #j))
        & not (A = B)
-       & not (Ex #k. Rev(A)@k) & not (Ex #k. Rev(B)@k)
+       & not (Ex X #k. Rev(X)@k)
     "
 
 lemma injectiveAgreementInitiator:
