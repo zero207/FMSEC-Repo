@@ -1,0 +1,114 @@
+theory OTR2
+begin
+
+builtins: signing, diffie-hellman
+
+/*
+1. A -> B: g^x, [g^x]_sk(A), pk(A)
+2. B -> A: g^y, [g^y]_sk(B), pk(B)
+*/
+
+// Public key infrastructure
+
+rule Reg_ltk:
+  [ Fr(~sk) ]
+  -->
+  [ !Ltk($A, ~sk), !Pk($A, pk(~sk)), Out(pk(~sk)) ]
+
+rule Reveal_ltk:
+  [ !Ltk(A, k) ]
+  --[ Rev(A) ]->
+  [ Out(k) ]
+
+// Initalisation rules
+
+//Initialise A
+rule Initialise_A:
+  [ Fr(~id), !Ltk(A, skA) ]
+  --[ Create_A(A, ~id) ]->
+  [ St_A_1(A, ~id, $B, skA) ]
+
+//Initialise B
+rule Initialise_B:
+  [ Fr(~id), !Ltk(B, skB) ]
+  --[ Create_B(B, ~id) ]->
+  [ St_B_1(B, ~id, $A, skB) ]
+
+
+// Protocol
+
+//A sends g^x and its public key to B
+rule A_1_send:
+  let msg = <'g'^~x, sign{'g'^~x}skA, pk(skA)> in
+  [ Fr(~x)
+  , St_A_1(A, id, B, skA) ]
+  --[ Send_I_1(A, B, msg) ]->
+  [ St_A_2(A, id, B, skA, ~x), Out(msg) ]
+
+/* B receives message containing a signed value
+    and a public key */
+rule B_1_receive:
+  let msg = <X, sign{X}skA, pk(skA)> in
+  [ St_B_1(B, id, A, skB)
+  , !Pk(A, pk(skA))
+  , In(msg) ]
+  --[ Recv_R_1(B, A, msg) ]->
+  [ St_B_2(B, id, A, skB, X, pk(skA)) ]
+
+//B sends g^y and its public key to A
+rule B_2_send:
+  let msg = <'g'^~y, sign{'g'^~y}skB, pk(skB)> in
+  [ Fr(~y)
+  , St_B_2(B, id, A, skB, X, pk(skA)) ]
+  --[ Send_R_2(B, A, msg)
+  , Running(B, A, <'I', 'R', 'g'^~y, pk(skB)>)
+  , Honest(A)
+  , Honest(B)
+  , Finish(B) ]->
+  [ St_B_3(B, id, A, skB, ~y, X, pk(skA)), Out(msg) ]
+
+/* A receives message containing a signed value
+    and a public key */
+rule A_2_receive:
+  let msg = <Y, sign{Y}skB, pk(skB)> in
+  [ St_A_2(A, id, B, skA, x)
+  , !Pk(B, pk(skB))
+  , In(msg) ]
+  --[ Recv_I_2(A, B, msg)
+  , Commit(A, B, <'I', 'R', Y, pk(skB)>)
+  , Honest(A)
+  , Honest(B)
+  , Finish(A) ]->
+  [ St_A_3(A, id, B, skA, x, Y, pk(skB)) ]
+
+
+// Lemmas
+
+// succeeds
+lemma executable:
+  exists-trace
+    "Ex A B msg #i #j #p #q.
+       Finish(A)@i & Finish(B)@j
+       & Recv_I_2(A, B, msg)@p & Send_R_2(B, A, msg)@q
+       & not (Ex Name1 Id1 Name2 Id2 #i #j. Create_A(Name1, Id1) @i & Create_A(Name2, Id2) @j & not(#i = #j))
+       & not (Ex Name1 Id1 Name2 Id2 #i #j. Create_B(Name1, Id1) @i & Create_B(Name2, Id2) @j & not(#i = #j))
+       & not (A = B)
+       & not (Ex X #k. Rev(X)@k)
+    "
+
+//  fails
+lemma NonInjectiveAgreementInitiator:
+    "All A B t #i.
+     Commit(A, B, <'I', 'R', t>)@i
+
+//   And only one agent A
+     & not (Ex Name1 Id1 Name2 Id2 #i #j. Create_A(Name1, Id1) @i & Create_A(Name2, Id2) @j & not(#i = #j))
+
+//   And only one agent B with the same name.
+     & not (Ex Name1 Id1 Id2 #i #j. Create_B(Name1, Id1) @i & Create_B(Name1, Id2) @j & not(#i = #j))
+//  And different agents
+     & not (A = B)
+     ==> (Ex #j. Running(B, A,<'I', 'R', t>)@j)
+                | (Ex X #r. Rev(X)@r)"
+
+end
