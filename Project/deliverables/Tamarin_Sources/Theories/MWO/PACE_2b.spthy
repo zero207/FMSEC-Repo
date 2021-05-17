@@ -4,10 +4,10 @@ begin
 functions: mac/2
 
 /*
-1. A -> B: x
-2. B -> A: y
-3. A -> B: ['A', x, y]_k(B,A)
-4. B -> A: ['B', x, y]_k(A,B)
+1a. A -> B: x
+1b. B -> A: y
+2a. A -> B: ['A', x, y]_k(B,A)
+2b. B -> A: ['B', x, y]_k(A,B)
 */
 
 // Shared key infrastructure rules
