@@ -1,4 +1,4 @@
-theory PACE_2a_seq
+theory PACE_2b_seq
 begin
 
 functions: mac/2
@@ -75,7 +75,7 @@ rule A_2_receive:
 
 //A sends message my (MAC of y)
 rule A_3_send:
-    let my = mac(kBA, <'A', x, y> in
+    let my = mac(kBA, <'A', x, y>) in
     [ St_A_3(A, id, B, kAB, kBA, x, y) ]
     --[ Send(A, B,  my)
     , Running(A, B, <'R', 'I', x, y>) ]->
@@ -83,7 +83,7 @@ rule A_3_send:
 
 //B receives message my (MAC of y)
 rule B_3_receive:
-    let my = mac(kBA, <'A', x, y> in
+    let my = mac(kBA, <'A', x, y>) in
     [ St_B_3(B, id, A, kAB, kBA, x, y)
     , In(my) ]
     --[ Recv(B, A,  my) ]->
@@ -121,9 +121,9 @@ lemma executable:
   exists-trace
     "Ex A B   #i #j.
        Finish(A)@i & Finish(B)@j
+       & (All Name1 Id1 Name2 Id2 #i #j. Create_A(Name1, Id1, 'roleA') @i & Create_A(Name2, Id2, 'roleA') @j ==> #i = #j)
+       & (All Name1 Id1 Name2 Id2 #i #j. Create_B(Name1, Id1, 'roleB') @i & Create_B(Name2, Id2, 'roleB') @j ==> #i = #j)
        & not (A = B)
-       & not (Ex Name1 Id1 Name2 Id2 #i #j. Create_A(Name1, Id1, 'roleA') @i & Create_A(Name2, Id2, 'roleA') @j & not(#i = #j))
-       & not (Ex Name1 Id1 Name2 Id2 #i #j. Create_B(Name1, Id1, 'roleB') @i & Create_B(Name2, Id2, 'roleB') @j & not(#i = #j))
        & not (Ex X #k. Rev(X)@k)
     "
 
@@ -133,8 +133,6 @@ lemma nonInjectiveAgreementInitiator:
     Commit(a, b, <'I','R',t>)@i
     ==> (Ex #j. Running(b, a,<'I', 'R', t>)@j)
     | (Ex X #r. Rev(X)@r & Honest(X)@i)
-//    |  (Ex A B C D k1 k2 l1 l2 #i #j. Create_B(A, B, k1, k2) @i & Create_B(C, D, l1, l2) @j & not( #i = #j))
-//     not ((All A B C D k l #i #j. INIT_A(A, B, k)@i & INIT_A(C, D, l)@j ==> #i = #j))
 "
 
 // fails

@@ -141,8 +141,8 @@ lemma executable:
   exists-trace
     "Ex A B #i #j.
        Finish(A)@i & Finish(B)@j
-       & not (Ex Name1 Id1 Name2 Id2 #i #j. Create_A(Name1, Id1, 'roleA') @i & Create_A(Name2, Id2, 'roleA') @j & not(#i = #j))
-       & not (Ex Name1 Id1 Name2 Id2 #i #j. Create_B(Name1, Id1, 'roleB') @i & Create_B(Name2, Id2, 'roleB') @j & not(#i = #j))
+       & (All Name1 Id1 Name2 Id2 #i #j. Create_A(Name1, Id1, 'roleA') @i & Create_A(Name2, Id2, 'roleA') @j ==> #i = #j)
+       & (All Name1 Id1 Name2 Id2 #i #j. Create_B(Name1, Id1, 'roleB') @i & Create_B(Name2, Id2, 'roleB') @j ==> #i = #j)
        & not (A = B)
        & not (Ex X #k. Rev(X)@k)
     "
