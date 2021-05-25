@@ -12,7 +12,7 @@ builtins: signing, diffie-hellman
 
 rule Reg_ltk:
   [ Fr(~sk) ]
-  -->
+  --[Reg(~sk)]->
   [ !Ltk($A, ~sk), !Pk($A, pk(~sk)), Out(pk(~sk)) ]
 
 rule Reveal_ltk:
@@ -25,13 +25,13 @@ rule Reveal_ltk:
 //Initialise A
 rule Initialise_A:
   [ Fr(~id), !Ltk(A, skA) ]
-  --[ Create_A(A, ~id) ]->
+  --[ Create_A(A, ~id, 'I') ]->
   [ St_A_1(A, ~id, $B, skA) ]
 
 //Initialise B
 rule Initialise_B:
   [ Fr(~id), !Ltk(B, skB) ]
-  --[ Create_B(B, ~id) ]->
+  --[ Create_B(B, ~id, 'R') ]->
   [ St_B_1(B, ~id, $A, skB) ]
 
 
@@ -90,8 +90,8 @@ lemma executable:
     "Ex A B msg #i #j #p #q.
        Finish(A)@i & Finish(B)@j
        & Recv_I_2(A, B, msg)@p & Send_R_2(B, A, msg)@q
-       & not (Ex Name1 Id1 Name2 Id2 #i #j. Create_A(Name1, Id1) @i & Create_A(Name2, Id2) @j & not(#i = #j))
-       & not (Ex Name1 Id1 Name2 Id2 #i #j. Create_B(Name1, Id1) @i & Create_B(Name2, Id2) @j & not(#i = #j))
+       & (All Name1 Id1 Name2 Id2 #i #j. Create_A(Name1, Id1, 'I') @i & Create_A(Name2, Id2, 'I') @j ==> #i = #j)
+       & (All Name1 Id1 Name2 Id2 #i #j. Create_B(Name1, Id1, 'R') @i & Create_B(Name2, Id2, 'R') @j ==> #i = #j)
        & not (A = B)
        & not (Ex X #k. Rev(X)@k)
     "
@@ -102,10 +102,11 @@ lemma NonInjectiveAgreementInitiator:
      Commit(A, B, <'I', 'R', t>)@i
 
 //   And only one agent A
-     & not (Ex Name1 Id1 Name2 Id2 #i #j. Create_A(Name1, Id1) @i & Create_A(Name2, Id2) @j & not(#i = #j))
+     & (All Name1 Id1 Name2 Id2 #i #j. Create_A(Name1, Id1, 'I') @i & Create_A(Name2, Id2, 'I') @j ==> #i = #j)
 
 //   And only one agent B with the same name.
-     & not (Ex Name1 Id1 Id2 #i #j. Create_B(Name1, Id1) @i & Create_B(Name1, Id2) @j & not(#i = #j))
+     & (All Name1 Id1 Id2 #i #j. Create_B(Name1, Id1, 'R') @i & Create_B(Name1, Id2, 'R') @j ==> #i =#j)
+
 //  And different agents
      & not (A = B)
      ==> (Ex #j. Running(B, A,<'I', 'R', t>)@j)
