@@ -83,15 +83,15 @@ B \rightarrow A: [x]_{k(a,b}
 For the first revision of the protocol, we implemented two different protocol approaches. Firstly, we designed the protocol sequentially. This means that Alice must have received something from Bob before Alice can send something to Bob. This variant can be found in the file \textbf{PACE_2a_seq.spthy}. Furthermore, we have implemented a parallel variant, which can be found under \textbf{PACE_2a.spthy}. To be able to carry out the MIM attack, the sequential variant is needed.
 \begin{enumerate}[label=\alph*)]
 	\item If we assume that there can be a network attacker who can eavesdrop on all the information exchanged.  So we can assume that this protocol is vulnerable to \textit{
-	MIM attacks}. Since neither Alice nor Bob include any information in their messages to authenticate the message, it can be intercepted by an eavesdropper. Alice thinks she is    	talking to Bob. However, she is talking to Bob. Bob, on the other hand, thinks he is talking to Alice although he is talking to the attacker who is pretending to be Alice.
-	An attack scenario could look like following:
+	MIM attacks}. Since neither Alice nor Bob include any information in their messages to authenticate the message, it can be intercepted by an eavesdropper. Alice thinks she is    	talking to Bob. However, she is talking to Bob.  Bob, on the other hand, thinks he is talking to Alice although he is talking to the attacker who is pretending to be Alice.
+	The following attack scenario disproves the non-injective agreement on the nonces x and y for  B:
 	\begin{align*}
 	A \rightarrow A'_{eaves}: x\\
 	A'_{eaves} \rightarrow B: x'\\
 	B \rightarrow A : y\\
 	A \rightarrow B : [y]_{k(a,b)}
 	\end{align*}
-	\item The problem with the protocol in a) is the fact that neither Alice nor Bob authenticate their messages. Thus, neither Alice nor Bob can actually know whether the	    				message they receive comes from the person they want. In order to eliminate this weakness, an identifier of the respective identity is given to the message. Thus, the property 		of the injective agreement now holds for both.
+	\item The problem with the protocol in a) is the fact that neither Alice nor Bob authenticate their messages. Thus, neither Alice nor Bob can actually know whether the	    				message they receive comes from the person they want.  In order to eliminate this weakness, an identifier of the respective identity is given to the message. Thus, the property 		of the injective agreement now holds for both.
 	\begin{align*}
 	A \rightarrow B: x\\
 	B \rightarrow A: y\\
@@ -102,15 +102,36 @@ For the first revision of the protocol, we implemented two different protocol ap
 \end{enumerate}
 \subsection{Introducing a session key}
 \begin{enumerate}[label=\alph*)]
-	\item Solution a
-	\item Solution b
+	\item With the second refinement we can provide and hold mutual injective agreement on the nonces x and y and therefore on Kab = kdf(k(A,B),x,y). The refined protocol is 			defined like following:
+	\begin{align*}
+	A \rightarrow B: x\\
+	B \rightarrow A: y\\
+	A \rightarrow B: [A,  y]_{kdf(k(A,  B), x, y)}\\
+	B \rightarrow A: [B,  x]_{kdf(k(A,  B), x, y)}
+	\end{align*}
+	\item In contrast to protocol P2, the two nonces in P3 are not MAC'ed, but instead used to generate Kab. Kab has the property that it cannot be manipulated or faked by the 			intruder. This ensures that the MAC'ed message was only sent by a participant with the correct role. In this way, protocol PACE_3a ensures consistency across both nonces 			and roles. 
 \end{enumerate}
 \subsection{Replace the password by a nonce}
+The refined protocol is very similar to the previous protocol. Only the weak key k(A,B) is replaced by s.
+	\begin{align*}
+	A \rightarrow B: x, {s}_{h(k(A,B)}\\
+	B \rightarrow A: y\\
+	A \rightarrow B: [A,  y]_{kdf(s, x, y)}\\
+	B \rightarrow A: [B,  x]_{kdf(s, x, y)}
+	\end{align*}
+	Compare with \textbf{PACE_3a.spthy} our parallel and \textbf{PACE_3a_seq.spthy} our sequential solution.  All three security properties from the previous expansion stages 		are retained
 \subsection{Introducing Diffie-Hellman: The PACE protocol}
 \begin{enumerate}[label=\alph*)]
-	\item Solution a
-	\item Solution b
-	\item Solution c
+	\item The nonces x and y were replaced by Diffie-Hellman keys $g^x$ and $g^y$. The refined protocol looks now like following:
+	  \begin{align*}
+    		A \rightarrow B: g^x, p, {s}_{h(k(A,  B)}\\
+		B \rightarrow A: g^y\\
+		A \rightarrow B: [A,  g^y]_{h(g^{xy})}\\
+		B \rightarrow A: [B,  g^x]_{h(g^{xy})}
+  	\end{align*}
+	\item Perfect forward secrecy is achieved for $g^{xy}$.  See \textbf{PACE_5ab.spthy}.
+	\item The secrecy of the base is an essential part of the protocol. This is guaranteed by the encryption with s and the common password k(A,B).  Otherwise, a Dolev-Yao 				attacker would be able to infiltrate as a participant who knows the shared secret.  In this way, the protocol would continue to run successfully. However, it would not be 
+	guaranteed that A would talk to B or vice versa.
 	\item Solution d
 \end{enumerate}
 \section{The Off-the-Record Messaging Protocol}
