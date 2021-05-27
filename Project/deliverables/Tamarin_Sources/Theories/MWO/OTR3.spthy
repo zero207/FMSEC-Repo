@@ -24,16 +24,15 @@ rule Reveal_ltk:
 
 //Initialise A
 rule Initialise_A:
-  [ Fr(~id), !Ltk(A, skA) ]
+  [ Fr(~id), !Ltk(A, skA), !Pk(B, pk(skB)) ]
   --[ Create_A(A, ~id, 'I') ]->
-  [ St_A_1(A, ~id, $B, skA) ]
+  [ St_A_1(A, ~id, skA, B, pk(skB)) ]
 
 //Initialise B
 rule Initialise_B:
-  [ Fr(~id), !Ltk(B, skB) ]
+  [ Fr(~id), !Ltk(B, skB),!Pk(A, pk(skA))  ]
   --[ Create_B(B, ~id, 'R') ]->
-  [ St_B_1(B, ~id, $A, skB) ]
-
+  [ St_B_1(B, ~id, skB, A, pk(skA)) ]
 
 // Protocol
 
@@ -41,41 +40,41 @@ rule Initialise_B:
 rule A_1_send:
   let msg = <'g'^~x, sign{<'g'^~x, B>}skA, pk(skA)> in
   [ Fr(~x)
-  , St_A_1(A, id, B, skA) ]
+  , St_A_1(A, id, skA, B, pk(skB)) ]
   --[ Send_I_1(A, B, msg)
    , Running(A, B, <'R', 'I', 'g'^~x, pk(skA)>) ]->
-  [ St_A_2(A, id, B, skA, ~x), Out(msg) ]
+  [ St_A_2(A, id, skA, B, pk(skB), ~x), Out(msg) ]
 
 /* B receives message containing a signed value
     and a public key */
 rule B_1_receive:
   let msg = <X, sign{<X, B>}skA, pk(skA)> in
-  [ St_B_1(B, id, A, skB)
-  , !Pk(A, pk(skA))
+  [ St_B_1(B, id, skB, A, pk(skA))
   , In(msg) ]
   --[ Recv_R_1(B, A, msg)
     , Commit(B, A, <'R', 'I', X, pk(skA)>)
     , Honest(A)
     , Honest(B) ]->
-  [ St_B_2(B, id, A, skB, X, pk(skA)) ]
+  [ St_B_2(B, id, skB, A, pk(skA), X) ]
 
 //B sends g^y and its public key to A
 rule B_2_send:
   let msg = <'g'^~y, sign{<'g'^~y, A>}skB, pk(skB)> in
   [ Fr(~y)
-  , St_B_2(B, id, A, skB, X, pk(skA)) ]
+  , St_B_2(B, id, skB, A, pk(skA), X) ]
   --[ Send_R_2(B, A, msg)
   , Running(B, A, <'I', 'R', 'g'^~y, pk(skB)>)
   , Secret(B, X^~y)
+  , Honest(A)
+  , Honest(B)
   , Finish(B) ]->
-  [ St_B_3(B, id, A, skB, ~y, X, pk(skA)), Out(msg) ]
+  [ St_B_3(B, id, skB, A, pk(skA), ~y, X), Out(msg) ]
 
 /* A receives message containing a signed value
     and a public key */
 rule A_2_receive:
   let msg = <Y, sign{<Y, A>}skB, pk(skB)> in
-  [ St_A_2(A, id, B, skA, x)
-  , !Pk(B, pk(skB))
+  [ St_A_2(A, id, skA, B, pk(skB), x)
   , In(msg) ]
   --[ Recv_I_2(A, B, msg)
   , Commit(A, B, <'I', 'R', Y, pk(skB)>)
@@ -83,7 +82,7 @@ rule A_2_receive:
   , Honest(A)
   , Honest(B)
   , Finish(A) ]->
-  [ St_A_3(A, id, B, skA, x, Y, pk(skB)) ]
+  [ St_A_3(A, id, skA, B, pk(skB), x, Y) ]
 
 
 // Lemmas
@@ -107,27 +106,11 @@ lemma nonInjectiveAgreementInitiator:
     ==> (Ex #j. Running(b, a,<'I', 'R', t>)@j)
     | (Ex X #r. Rev(X)@r & Honest(X)@i)"
 
-lemma InjectiveAgreementInitiator:
-    "All a b t #i.
-     Commit(a, b, <'I', 'R', t>)@i
-     ==> (Ex #j. Running(b, a,<'I', 'R', t>)@j
-     & not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>) @i2
-     & not (#i2 = #i)))
-          | (Ex X #r. Rev(X)@r & Honest(X) @i)"
-
 lemma nonInjectiveAgreementResponder:
      "All a b t #i.
     Commit(a, b, <'R','I',t>)@i
     ==> (Ex #j. Running(b, a,<'R', 'I', t>)@j)
     | (Ex X #r. Rev(X)@r & Honest(X)@i)"
-
-lemma InjectiveAgreementResponder:
-    "All a b t #i.
-      Commit(a, b, <'R','I',t>)@i
-      ==> (Ex #j. Running(b, a,<'R', 'I', t>)@j
-              & not (Ex a2 b2 #i2. Commit(a2,b2,<'R','I',t>) @i2
-              & not (#i2 = #i)))
-          | (Ex X #r. Rev(X)@r & Honest(X) @i)"
 
 // succeeds
 lemma NonInjectiveAgreementInitiatorOld:
@@ -145,7 +128,7 @@ lemma NonInjectiveAgreementInitiatorOld:
      ==> (Ex #j. Running(B, A,<'I', 'R', t>)@j)
                 | (Ex X #r. Rev(X)@r)"
 
-// fails
+// Doesn't complete
 
 lemma secrecy:
     "All A x #i.
