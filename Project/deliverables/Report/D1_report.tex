@@ -59,7 +59,7 @@
 \newenvironment{solution}%
 {\par{\noindent\small\textit{Solution:}}\vspace{-12pt}\begin{framed}}%
 {\end{framed}\par}
-
+\newcommand{\tuple}[1]{\left\langle #1\right\rangle}
 \begin{document}
 \maketitle
 
@@ -71,68 +71,74 @@ The following simple challenge-response protocol was formalized in Tamarin:
   A \rightarrow B: x\\
   B \rightarrow A: [x]_{k(a,b)}
 \end{align*}
-The MAC function was realised by an user-defined function with two parameters in Tamarin.  The details can be found in theory file \textbf{PACE_1.spthy}. 
+The MAC function was realised by an user-defined function with two parameters in Tamarin.  The details can be found in theory file \texttt{PACE_1.spthy}. 
 \subsection{Mutual authentication}
-The challenge-response protocol is extended in this subtask in that now it is not just Alice who sends a nonce x to Bob.  Bob now also generates and sends a nonce y,  which is sent to A. The goal of the protocol is to reach an agreement between the two roles A and B with both nonces. Formally, the protocol now looks like this:
+The challenge-response protocol is extended in this subtask in that now it is not just Alice who sends a nonce $x$ to Bob.  Bob now also generates and sends a nonce $y$,  which is sent to $A$. The goal of the protocol is to reach an agreement between the two roles $A$ and $B$ with both nonces. 
+\begin{enumerate}[label=\alph*)]
+	\item Formally, the protocol now looks like this:
 \begin{align*}
 A \rightarrow B: x\\
 B \rightarrow A: y\\
-A \rightarrow B: [y]_{k(b,a)}\\
-B \rightarrow A: [x]_{k(a,b}
+A \rightarrow B: [y]_{k(B,A)}\\
+B \rightarrow A: [x]_{k(A,B)}
 \end{align*}
-For the first revision of the protocol, we implemented two different protocol approaches. Firstly, we designed the protocol sequentially. This means that Alice must have received something from Bob before Alice can send something to Bob. This variant can be found in the file \textbf{PACE_2a_seq.spthy}. Furthermore, we have implemented a parallel variant, which can be found under \textbf{PACE_2a.spthy}. To be able to carry out the MIM attack, the sequential variant is needed.
-\begin{enumerate}[label=\alph*)]
-	\item If we assume that there can be a network attacker who can eavesdrop on all the information exchanged.  So we can assume that this protocol is vulnerable to \textit{
-	MIM attacks}. Since neither Alice nor Bob include any information in their messages to authenticate the message, it can be intercepted by an eavesdropper. Alice thinks she is    	talking to Bob. However, she is talking to Bob.  Bob, on the other hand, thinks he is talking to Alice although he is talking to the attacker who is pretending to be Alice.
-	The following attack scenario disproves the non-injective agreement on the nonces x and y for  B:
+For the first revision of the protocol, we implemented two different protocol approaches.  Firstly,  we designed the protocol sequentially.  This means that Alice must have received something from Bob before Alice can send something to Bob.  This variant can be found in the file \texttt{PACE_2a_seq.spthy}. Furthermore,  we have implemented a parallel variant,  which can be found under \texttt{PACE_2a.spthy}. To be able to carry out the attack, the sequential variant is needed.  \newline
+The problem in the protocol is that,  taking into account a Dolev-Yao intruder,  the non-injective agreement can be disproved here for both nonces $x$ and $y$ for both 		Alice and Bob. This is because neither Alice nor Bob can know for sure whether the message received was actually sent by the other or by an intruder.  Therefore, in this case,  a \textit{message replay attack} can take place.  In the case of a message being sent from Alice to Bob,  the attacker pretends to be Bob or vice versa.  The scenario can be represented as follows:
 	\begin{align*}
-	A \rightarrow A'_{eaves}: x\\
-	A'_{eaves} \rightarrow B: x'\\
-	B \rightarrow A : y\\
-	A \rightarrow B : [y]_{k(a,b)}
+	A \rightarrow Adv[B]: x\\
+	Adv[B] \rightarrow A: x\\
+	A \rightarrow B : [x]_{k(A,B)}\\
+	Adv[B] \rightarrow A: [x]_{k(A,B)}
 	\end{align*}
-	\item The problem with the protocol in a) is the fact that neither Alice nor Bob authenticate their messages. Thus, neither Alice nor Bob can actually know whether the	    				message they receive comes from the person they want.  In order to eliminate this weakness, an identifier of the respective identity is given to the message. Thus, the property 		of the injective agreement now holds for both.
+	\item We have solved the problem in protocol 2(a) by adding the identifiers 'A' and 'B' to the participant's nonces on the MAC'ed message.  Thus, the property of the 			injective agreement now holds for both.
 	\begin{align*}
 	A \rightarrow B: x\\
 	B \rightarrow A: y\\
-	A \rightarrow B: [<A, x, y>]_{k(b,a)}\\
-	B \rightarrow A: [<B, x, y>]_{k(a,b)}
+	A \rightarrow B: [\tuple{A, x, y}]_{k(b,a)}\\
+	B \rightarrow A: [\tuple{B, x, y}]_{k(a,b)}
 	\end{align*}
-	As before we have created a a sequential protocol ( see theory file \textbf{PACE_2b_seq.spthy}) and a parallel protocol ( see theory file \textbf{PACE_2b.spthy}).
+	As before we have created a sequential protocol ( see theory file \texttt{PACE_2b_seq.spthy}) and a parallel protocol ( see theory file \texttt{PACE_2b.spthy}).
 \end{enumerate}
 \subsection{Introducing a session key}
 \begin{enumerate}[label=\alph*)]
-	\item With the second refinement we can provide and hold mutual injective agreement on the nonces x and y and therefore on Kab = kdf(k(A,B),x,y). The refined protocol is 			defined like following:
+	\item With the second refinement we can provide and hold mutual injective agreement on the nonces x and y and therefore on $\mathsf{Kab = kdf(k(A,B),x,y)}$. The refined 		protocol is defined like following:
 	\begin{align*}
 	A \rightarrow B: x\\
 	B \rightarrow A: y\\
-	A \rightarrow B: [A,  y]_{kdf(k(A,  B), x, y)}\\
-	B \rightarrow A: [B,  x]_{kdf(k(A,  B), x, y)}
+	A \rightarrow B: [\tuple{A,  y}]_{kdf(k(A,  B), x, y)}\\
+	B \rightarrow A: [\tuple{B,  x}]_{kdf(k(A,  B), x, y)}
 	\end{align*}
-	\item In contrast to protocol P2, the two nonces in P3 are not MAC'ed, but instead used to generate Kab. Kab has the property that it cannot be manipulated or faked by the 			intruder. This ensures that the MAC'ed message was only sent by a participant with the correct role. In this way, protocol PACE_3a ensures consistency across both nonces 			and roles. 
+	\item In contrast to protocol \texttt{PACE_2}, the two nonces in \texttt{PACE_3a} are not MAC'ed, but instead used to generate $\mathsf{Kab}$.  $\mathsf{Kab}$ has the 				property that it cannot be manipulated or faked by the intruder. This ensures that the MAC'ed message was only sent by a participant with the correct role. In this way,  protocol 	\texttt{PACE_3a.spthy} ensures consistency across both nonces and roles. 
 \end{enumerate}
 \subsection{Replace the password by a nonce}
-The refined protocol is very similar to the previous protocol. Only the weak key k(A,B) is replaced by s.
+The refined protocol is very similar to the previous protocol. Only the low-entropy key $\mathsf{k(A,B)}$ is replaced by high-entropy password s.
 	\begin{align*}
-	A \rightarrow B: x, {s}_{h(k(A,B)}\\
+	A \rightarrow B: x, \left\lbrace s \right\rbrace_{h(k(A,B)}\\
 	B \rightarrow A: y\\
-	A \rightarrow B: [A,  y]_{kdf(s, x, y)}\\
-	B \rightarrow A: [B,  x]_{kdf(s, x, y)}
+	A \rightarrow B: [\tuple{A,  y}]_{kdf(s, x, y)}\\
+	B \rightarrow A: [\tuple{B,  x}]_{kdf(s, x, y)}
 	\end{align*}
-	Compare with \textbf{PACE_3a.spthy} our parallel and \textbf{PACE_3a_seq.spthy} our sequential solution.  All three security properties from the previous expansion stages 		are retained
+	Compare with \texttt{PACE_3a.spthy} our parallel and \texttt{PACE_3a_seq.spthy} our sequential solution.  All three security properties from the previous expansion stages 		are retained
 \subsection{Introducing Diffie-Hellman: The PACE protocol}
 \begin{enumerate}[label=\alph*)]
 	\item The nonces x and y were replaced by Diffie-Hellman keys $g^x$ and $g^y$. The refined protocol looks now like following:
 	  \begin{align*}
-    		A \rightarrow B: g^x, p, {s}_{h(k(A,  B)}\\
+    		A \rightarrow B: g^x, p, \left\lbrace s \right\rbrace_{h(k(A,  B)}\\
 		B \rightarrow A: g^y\\
-		A \rightarrow B: [A,  g^y]_{h(g^{xy})}\\
-		B \rightarrow A: [B,  g^x]_{h(g^{xy})}
+		A \rightarrow B: [\tuple{A,  g^y}]_{h(g^{xy})}\\
+		B \rightarrow A: [\tuple{B,  g^x}]_{h(g^{xy})}
   	\end{align*}
-	\item Perfect forward secrecy is achieved for $g^{xy}$.  See \textbf{PACE_5ab.spthy}.
-	\item The secrecy of the base is an essential part of the protocol. This is guaranteed by the encryption with s and the common password k(A,B).  Otherwise, a Dolev-Yao 				attacker would be able to infiltrate as a participant who knows the shared secret.  In this way, the protocol would continue to run successfully. However, it would not be 
-	guaranteed that A would talk to B or vice versa.
-	\item Solution d
+	\item Perfect forward secrecy is achieved for $g^{xy}$.  See \texttt{PACE_5ab.spthy}.
+	\item The secrecy of the base is an essential part of the protocol. This is guaranteed by the encryption with s and the common password $\mathsf{k(A,B)}$.  Otherwise, a 				Dolev-Yao attacker would be able to infiltrate as a participant who knows the shared secret.  In this way, the protocol would continue to run successfully. However, it would 
+	not be guaranteed that A would talk to B or vice versa.  By defining this basis g on a public basis, as in \texttt{PACE_5ab_pubg.spthy} one can identify new attacks on the 				protocol.
+	\item By removing the tags, the last two messages become unifiable (see \texttt{PACE_5_unify.spthy}).  In this way,  an attack on the security or authenticity can be made by 		an attacker using the parameters of $A$,  for example, to send them back to $A$ and thus pretend to be $B$.  
+	\begin{align*}
+    		A \rightarrow B: g^x, p, \left\lbrace s \right\rbrace_{h(k(A,  B)}\\
+		Adv[B] \rightarrow A: g^x\\
+		A \rightarrow B: [g^x]_{h(g^{xx})}\\
+		Adv[B] \rightarrow A: [g^x]_{h(g^{xx})}
+  	\end{align*}	
+	By adding the restriction that $g^x$ and $g^y$ must be different,  the attack shown above cannot be made (see \texttt{PACE_5d.spthy}).
 \end{enumerate}
 \section{The Off-the-Record Messaging Protocol}
 \subsection{Modeling the original OTR Key Exchange}
