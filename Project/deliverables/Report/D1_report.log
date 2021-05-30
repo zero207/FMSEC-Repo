@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.21 (TeX Live 2020) (preloaded format=pdflatex 2020.10.6)  29 MAY 2021 20:08
+This is pdfTeX, Version 3.14159265-2.6-1.40.21 (TeX Live 2020) (preloaded format=pdflatex 2020.10.6)  30 MAY 2021 11:59
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -598,20 +598,20 @@ File: t1aett.fd 1997/11/16 Font definitions for T1/aett.
 
 
 {/usr/local/texlive/2020/texmf-var/fonts/map/pdftex/updmap/pdftex.map}] [2]
-Overfull \hbox (3.90645pt too wide) in paragraph at lines 134--135
+Overfull \hbox (3.90645pt too wide) in paragraph at lines 129--130
 []\T1/aer/m/n/10.95 By re-mov-ing the tags, the last two mes-sages be-come unif
 i-able (see \T1/aett/m/n/10.95 PACE_-5_-unify.spthy\T1/aer/m/n/10.95 ).
  []
 
-Package atveryend Info: Empty hook `BeforeClearDocument' on input line 148.
+Package atveryend Info: Empty hook `BeforeClearDocument' on input line 143.
 [3] [4]
-Package atveryend Info: Empty hook `AfterLastShipout' on input line 148.
+Package atveryend Info: Empty hook `AfterLastShipout' on input line 143.
  (./D1_report.aux)
-Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 148.
-Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 148.
+Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 143.
+Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 143.
 Package rerunfilecheck Info: File `D1_report.out' has not changed.
 (rerunfilecheck)             Checksum: D41D8CD98F00B204E9800998ECF8427E;0.
-Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 148.
+Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 143.
  ) 
 Here is how much of TeX's memory you used:
  12134 strings out of 480608
@@ -620,7 +620,7 @@ Here is how much of TeX's memory you used:
  27762 multiletter control sequences out of 15000+600000
  559479 words of font info for 86 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 45i,9n,56p,10104b,471s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 45i,9n,56p,10104b,454s stack positions out of 5000i,500n,10000p,200000b,80000s
 </usr/local/texlive/2020/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb
 ></usr/local/texlive/2020/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi6.pfb><
 /usr/local/texlive/2020/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></u
@@ -632,7 +632,7 @@ l/texlive/2020/texmf-dist/fonts/type1/public/amsfonts/cm/cmss10.pfb></usr/local
 l/texlive/2020/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local
 /texlive/2020/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb></usr/local/
 texlive/2020/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt10.pfb>
-Output written on D1_report.pdf (4 pages, 131848 bytes).
+Output written on D1_report.pdf (4 pages, 132554 bytes).
 PDF statistics:
  129 PDF objects out of 1000 (max. 8388607)
  110 compressed objects within 2 object streams

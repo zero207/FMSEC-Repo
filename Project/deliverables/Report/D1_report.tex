@@ -83,13 +83,8 @@ A \rightarrow B: [y]_{k(B,A)}\\
 B \rightarrow A: [x]_{k(A,B)}
 \end{align*}
 For the first revision of the protocol, we implemented two different protocol approaches.  Firstly,  we designed the protocol sequentially.  This means that Alice must have received something from Bob before Alice can send something to Bob.  This variant can be found in the file \texttt{PACE_2a_seq.spthy}. Furthermore,  we have implemented a parallel variant,  which can be found under \texttt{PACE_2a.spthy}. To be able to carry out the attack, the sequential variant is needed.  \newline
-The problem in the protocol is that,  taking into account a Dolev-Yao intruder,  the non-injective agreement can be disproved here for both nonces $x$ and $y$ for both 		Alice and Bob. This is because neither Alice nor Bob can know for sure whether the message received was actually sent by the other or by an intruder.  Therefore, in this case,  a \textit{message replay attack} can take place.  In the case of a message being sent from Alice to Bob,  the attacker pretends to be Bob or vice versa.  The scenario can be represented as follows:
-	\begin{align*}
-	A \rightarrow Adv[B]: x\\
-	Adv[B] \rightarrow A: x\\
-	A \rightarrow B : [x]_{k(A,B)}\\
-	Adv[B] \rightarrow A: [x]_{k(A,B)}
-	\end{align*}
+The problem in the protocol is that,  taking into account a Dolev-Yao intruder,  the non-injective agreement can be disproved here for both nonces $x$ and $y$ for both 		Alice and Bob. This is because neither Alice nor Bob can know for sure whether the message received was actually sent by the other or by an intruder.  Therefore, in this case,  a \textit{man-in-the-middle attack} can take place as shown in the non-injective agreement lemmas in \texttt{PACE_2a_seq.spthy}.  \newline
+Here, the \textit{man-in-the-middle} establishes communication with Alice and Bob.  Alice and Bob think they are communicating with each other and send their nonces to the intruder. The attacker can now send the nonce back 1:1 or even send back any nonce.  Alice and Bob now assume that they are communicating with each other,  as there is no identifier in the exchanged messages.  The returned nonce is now used to send the made message.  Thus,  the protocol can be carried out successfully without Alice or Bob noticing that they have not communicated with each other.
 	\item We have solved the problem in protocol 2(a) by adding the identifiers 'A' and 'B' to the participant's nonces on the MAC'ed message.  Thus, the property of the 			injective agreement now holds for both.
 	\begin{align*}
 	A \rightarrow B: x\\
@@ -108,7 +103,7 @@ The problem in the protocol is that,  taking into account a Dolev-Yao intruder, 
 	A \rightarrow B: [\tuple{A,  y}]_{kdf(k(A,  B), x, y)}\\
 	B \rightarrow A: [\tuple{B,  x}]_{kdf(k(A,  B), x, y)}
 	\end{align*}
-	\item In contrast to protocol \texttt{PACE_2}, the two nonces in \texttt{PACE_3a} are not MAC'ed, but instead used to generate $\mathsf{Kab}$.  $\mathsf{Kab}$ has the 				property that it cannot be manipulated or faked by the intruder. This ensures that the MAC'ed message was only sent by a participant with the correct role. In this way,  protocol 	\texttt{PACE_3a.spthy} ensures consistency across both nonces and roles. 
+	\item In contrast to protocol \texttt{PACE_2b}, the two nonces in \texttt{PACE_3a} are not MAC'ed, but instead used to generate $\mathsf{Kab}$.  $\mathsf{Kab}$ has the 				property that it cannot be manipulated or faked by the intruder. This ensures that the MAC'ed message was only sent by a participant with the correct role. In this way,  protocol 	\texttt{PACE_3a.spthy} ensures consistency across both nonces and roles. 
 \end{enumerate}
 \subsection{Replace the password by a nonce}
 The refined protocol is very similar to the previous protocol. Only the low-entropy key $\mathsf{k(A,B)}$ is replaced by high-entropy password s.
@@ -118,7 +113,7 @@ The refined protocol is very similar to the previous protocol. Only the low-entr
 	A \rightarrow B: [\tuple{A,  y}]_{kdf(s, x, y)}\\
 	B \rightarrow A: [\tuple{B,  x}]_{kdf(s, x, y)}
 	\end{align*}
-	Compare with \texttt{PACE_3a.spthy} our parallel and \texttt{PACE_3a_seq.spthy} our sequential solution.  All three security properties from the previous expansion stages 		are retained
+	Compare with \texttt{PACE_4.spthy} our parallel and \texttt{PACE_4_seq.spthy} our sequential solution.  All three security properties from the previous expansion stages 		are retained
 \subsection{Introducing Diffie-Hellman: The PACE protocol}
 \begin{enumerate}[label=\alph*)]
 	\item The nonces x and y were replaced by Diffie-Hellman keys $g^x$ and $g^y$. The refined protocol looks now like following:
