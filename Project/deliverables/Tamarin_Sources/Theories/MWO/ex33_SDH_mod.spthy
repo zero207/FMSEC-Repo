@@ -1,0 +1,163 @@
+theory Ex3_SDH_mod
+begin
+
+section{* The Signed Diffie-Hellman Protocol *}
+
+/*
+  We model the following protocol:
+    1. A -> B: {1, B, g^x}sk(A)
+    2. B -> A: {2, A, g^y}sk(B)
+  We use Tamarin's built-in Diffie-Hellman and signing theories.
+*/
+
+builtins:
+  diffie-hellman, signing
+
+functions:
+  extract/1
+
+equations:
+  extract(sign{m}k) = m
+
+
+// Public key infrastructure
+
+rule Register:
+    [ Fr(~sk) ]
+  -->
+    [ !Ltk($A, ~sk), !Pk($A, pk(~sk)), Out(pk(~sk)) ]
+
+rule Reveal:
+    [ !Ltk(A, ltk) ]
+  --[ Rev(A) ]->
+    [ Out(ltk) ]
+
+
+// Protocol rules
+
+rule Init_A:
+    [ Fr(~id)
+    , !Ltk($A, skA)
+    , !Pk($B, pkB)
+    ]
+  --[ Create($A, ~id, 'roleA')
+    ]->
+    [ St_A_1($A, ~id, $B, skA, pkB)
+    ]
+
+rule Init_B:
+    [ Fr(~id)
+    , !Ltk($B, skB)
+    , !Pk($A, pkA)
+    ]
+  --[ Create($B, ~id, 'roleB')
+    ]->
+    [ St_B_1($B, ~id, $A, skB, pkA)
+    ]
+
+rule A_1_Send:
+    [ St_A_1($A, id, $B, skA, pkB)
+    , Fr(~x)
+    ]
+  --[ Send($A, sign{'1', $A, $B, 'g' ^ ~x}skA)
+   , Running($A, $B, <'R', 'I', 'g'^~x, pk(skA)>)
+    ]->
+    [ St_A_2($A, id, $B, skA, pkB, ~x)
+    , Out( sign{'1', $B, 'g' ^ ~x}skA )
+    ]
+
+rule B_1_Recv:
+    [ St_B_1($B, id, $A, skB, pk(skA))
+    , In( sign{'1', $B, X}skA )
+    ]
+  --[ Recv($B, sign{'1', $A, $B, X}skA)
+    , Commit($B, $A, <'R', 'I', X, pk(skA)>)
+    , Honest($A), Honest($B)
+    ]->
+    [ St_B_2($B, id, $A, skB, pk(skA), X)
+    ]
+
+rule B_2_Send:
+    [ St_B_2($B, id, $A, skB, pk(skA), X)
+    , Fr(~y)
+    ]
+  --[ Send($B, sign{'2', $B, $A, 'g' ^ ~y}skB)
+    , Running($B, $A, <'I', 'R', 'g'^~y, pk(skB)>)
+    , Claim_secret($B, X ^ ~y)
+    , Honest($B), Honest($A)
+    ]->
+    [ St_B_3($B, id, $A, skB, pk(skA), X, ~y)
+    , Out( sign{'2', $A, 'g' ^ ~y}skB )
+    ]
+
+rule A_2_Recv:
+    [ St_A_2($A, id, $B, skA, pk(skB), x)
+    , In( sign{'2', $A, Y}skB )
+    ]
+  --[ Recv($A, sign{'2', $B, $A, Y}skB)
+    , Commit($A, $B, <'I', 'R', Y, pk(skB)>)
+    , Claim_secret($A, Y ^ x)
+    , Honest($A), Honest($B)
+    ]->
+    [ St_A_3($A, id, $B, skA, pk(skB), x, Y)
+    ]
+
+
+// Security properties
+
+lemma Key_Secrecy:
+  "All A Kab #i.
+     Claim_secret(A, Kab)@i
+     ==>
+     ( not (Ex #k. K(Kab)@k)
+     | (Ex B #r. Rev(B)@r & Honest(B)@i)
+     )
+  "
+
+lemma Key_Forward_Secrecy:
+  "All A Kab #i.
+     Claim_secret(A, Kab)@i
+     ==>
+     ( not (Ex #k. K(Kab)@k)
+     | (Ex B #r. Rev(B)@r & Honest(B)@i & r < i)
+     )
+  "
+
+lemma Executability:
+  exists-trace
+    "Ex A B Kab #i #j.
+       Claim_secret(A, Kab)@i & Claim_secret(B, Kab)@j & not (A = B) &
+       not (Ex B #k. Rev(B)@k)"
+
+lemma nonInjectiveAgreementInitiator:
+  "All a b t #i.
+    Commit(a, b, <'I','R',t>)@i
+    ==> (Ex #j. Running(b, a,<'I', 'R', t>)@j)
+    | (Ex X #r. Rev(X)@r & Honest(X)@i)"
+
+lemma nonInjectiveAgreementResponder:
+     "All a b t #i.
+    Commit(a, b, <'R','I',t>)@i
+    ==> (Ex #j. Running(b, a,<'R', 'I', t>)@j)
+    | (Ex X #r. Rev(X)@r & Honest(X)@i)"
+
+//fails
+
+lemma InjectiveAgreementInitiator:
+    "All a b t #i.
+     Commit(a, b, <'I', 'R', t>)@i
+     ==> (Ex #j. Running(b, a,<'I', 'R', t>)@j
+     & not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>) @i2
+     & not (#i2 = #i)))
+          | (Ex X #r. Rev(X)@r & Honest(X) @i)"
+
+lemma InjectiveAgreementResponder:
+    "All a b t #i.
+      Commit(a, b, <'R','I',t>)@i
+      ==> (Ex #j. Running(b, a,<'R', 'I', t>)@j
+              & not (Ex a2 b2 #i2. Commit(a2,b2,<'R','I',t>) @i2
+              & not (#i2 = #i)))
+          | (Ex X #r. Rev(X)@r & Honest(X) @i)"
+
+
+end
