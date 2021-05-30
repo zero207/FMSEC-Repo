@@ -55,8 +55,8 @@
 \hypertarget{otr-key-exchange-protocol}{%
 \section{2 OTR key-exchange Protocol}\label{otr-key-exchange-protocol}}
 
-\hypertarget{protocol-modelling}{%
-\subsection{2.1 Protocol modelling}\label{protocol-modelling}}
+\hypertarget{protocol-modeling}{%
+\subsection{2.1 Protocol modeling}\label{protocol-modeling}}
 
 In the given paper, the key-exchange protocol is described as follows:
 
@@ -96,7 +96,7 @@ sk(x) and pk(x) are the key-pairs generated for each agent.
 
 In order to model the executable lemma, we add \emph{Finish} statements at the end of the protocol for each agent; we also make sure that a message received by A corresponds to a message sent by B, that only one agent A and one agent B are created and finally that agent A and agent B are different.
 
-See OTR1.spthy
+See \emph{OTR1.spthy}
 
 \newpage
 \hypertarget{attack-on-authentication}{%
@@ -104,21 +104,63 @@ See OTR1.spthy
 
 The ``man in the middle'' attack presented in the paper looks as follows:
 
-\[A \rightarrow E[B] : g^x, Sign_{sk_A} (g^x), vk_A\]
-\[E \rightarrow B : g^x, Sign_{sk_E} (g^x), vk_E\]
-\[E \leftarrow B : g^y, Sign_{sk_B} (g^y), vk_B\]
-\[A \leftarrow E[B] : g^y, Sign_{sk_B} (g_y), vk_B\]
+\[ A \rightarrow E[B] : g^x, Sign_{sk_A} (g^x), vk_A \]
+\[ E \rightarrow B : g^x, Sign_{sk_E} (g^x), vk_E \]
+\[ E \leftarrow B : g^y, Sign_{sk_B} (g^y), vk_B \]
+\[ A \leftarrow E[B] : g^y, Sign_{sk_B} (g_y), vk_B \]
 
 The adversary E impersonates B for A (hence the notation E[B] for the communication between A and E) and then forwards $g^x$ to B but signed with E's key. B then replies to E by sending $g^y$ signed by B's key and E forwards this message to A.
 
-We were able to reproduce a similar attack in tamarin, but not quite the exact one. In this attack we created one agent A and two agents B (one representing the man in the middle E), but because the agent B is only able to send a $g^y$ where \emph{y} is fresh, E cannot forward $g^x$ to B, but sends its own $g^z$ to B; in the same manner E cannot forward B's reply to A and so the attack in tamarin looks as follows:
+We were able to reproduce a similar attack in tamarin by restricting the creation of only one agent A and  max. two agents B (one representing the man in the middle E), but this attack is not quite the one described previously. In this attack, because the agent B is only able to send a fresh $g^y$ (where \emph{y} is fresh), E[B] cannot forward $g^x$ to B, but sends its own $g^z$ to B; in the same manner E[B] cannot forward B's reply to A and so the attack in tamarin looks as follows:
 
-\[A \rightarrow E[B] : g^x, Sign_{sk_A} (g^x), vk_A\]
-\[E \rightarrow B : g^z, Sign_{sk_E} (g^z), vk_E\]
-\[A \leftarrow B : g^y, Sign_{sk_B} (g^y), vk_B\]
+\[ A \rightarrow E[B] : g^x, Sign_{sk_A} (g^x), vk_A \]
+\[ E \rightarrow B : g^z, Sign_{sk_E} (g^z), vk_E \]
+\[ B \rightarrow A : g^y, Sign_{sk_B} (g^y), vk_B \]
 
 So at the end A and B won't be able to communicate because the resulting key is different for A and B ($g^{xy}$ for A and $g^{zy }$) for B.
 
-See OTR2.spthy
+See \emph{OTR2.spthy}
 
+\newpage
+\hypertarget{improvement}{%
+\subsection{2.3 Improvement}\label{improvement}}
+
+We implement the improvement as described in the OTR paper in section 3.1 as follows:
+
+\[ \text{1.} \quad A \rightarrow B: g^x, sign\{g^x, B\}_{sk(A)}, pk(A) \]
+\[ \text{2.} \quad B \rightarrow A: g^y, sign\{g^y, A\}_{sk(B)}, pk(B) \]
+
+and the analysis of the new protocol with the standard non-injective agreements (both on the initiator as well as on the responder side) proves unsatisfied, i.e. a trace was found for both lemmas. The previous non-injective agreement lemma now succeeds, i.e. no trace was found. It is included in the theory as \emph{NonInjectiveAgreementInitiatorOld}.
+
+As per tamarin-prover, an adversary is able to generate many key-pairs and create many agents A and B, which will simulate the various steps in the protocol, because there is no real link between the agent and its role, e.g. a malicious agent A can simulate being in the responder role and the same is valid for a malicious agent B in the initiator role. See \emph{OTR3.spthy}.
+
+But by adding the role in the agent's signature, e.g. by replacing agent A's  $sign\{g^x, B\}_{sk(A)}$  by  $sign\{I, g^x, B\}_{sk(A)}$(and the same for agent B), the non-injective agreement lemmas for both initiator and recipient now succeed. And the secrecy and forward secrecy lemmas also succeed. Unfortunately the injective agreement lemmas for both roles do fail as the specified protocol doesn't prevent an agent A to communicate with two agent B and vice versa. See \emph{OTR3\_B.spthy}.
+
+As an experiment, we modified the signed Diffie-Hellman theory seen in the exercise session to include the authentication lemmas (non-injective and injective) and there too the non injective agreement lemmas succeed but the injective ones fail. See \emph{ex33\_SDH\_mod.spthy}.
+
+\newpage
+\hypertarget{sigma}{%
+\subsection{2.4 SIGMA}\label{sigma}}
+
+In order to model the SIGMA protocol as described in the OTR paper in section 4.1, we add the builtin \emph{hashing} and a function \emph{mac(k, m)}. We then model the protocol as follows:
+
+\begin{align*}
+&\text{1.} \quad A \rightarrow B: g^x \\
+&\text{2.} \quad B \rightarrow A: g^y \\
+&\text{3.} \quad A \rightarrow B: A, sign\{g^y, g^x\}_{sk(A)}, MAC_{h(g^{xy})}('I', A), pk(A) \\
+&\text{4.} \quad B \rightarrow A: B, sign\{g^x, g^y\}_{sk(B)}, MAC_{h(g^{xy})}('R', B), pk(B)
+\end{align*}
+
+The analysis of the protocol shows that the following lemma succeed:
+
+\begin{itemize}
+    \item non-injective agreement initiator,
+    \item injective agreement initiator,
+    \item secrecy,
+    \item forward secrecy.
+\end{itemize}
+
+But the non-injective agreement responder fails. In the trace, one can see that the adversary can fool an honest agent B by creating a malicious agent A which intercepts the messages send by the honest agent A and also takes the responder role to fool the honest agent A.
+
+To be completed
 \end{document}
