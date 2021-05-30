@@ -157,22 +157,6 @@ lemma InjectiveAgreementResponder:
               & not (#i2 = #i)))
           | (Ex X #r. Rev(X)@r & Honest(X) @i)"
 
-
-// succeeds
-lemma NonInjectiveAgreementInitiatorOld:
-    "All A B t #i.
-     Commit(A, B, <'I', 'R', t>)@i
-
-//   And only one agent A
-     & not (Ex Name1 Id1 Name2 Id2 #i #j. Create_A(Name1, Id1, 'I') @i & Create_A(Name2, Id2, 'I') @j & not(#i = #j))
-
-//   And only one agent B with the same name.
-     & not (Ex Name1 Id1 Id2 #i #j. Create_B(Name1, Id1, 'R') @i & Create_B(Name1, Id2, 'R') @j & not(#i = #j))
-//  And different agents
-     & not (A = B)
-     ==> (Ex #j. Running(B, A,<'I', 'R', t>)@j)
-                | (Ex X #r. Rev(X)@r)"
-
 // succeeds
 
 lemma secrecy:
