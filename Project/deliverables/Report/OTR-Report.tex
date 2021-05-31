@@ -132,11 +132,14 @@ We implement the improvement as described in the OTR paper in section 3.1 as fol
 
 and the analysis of the new protocol with the standard non-injective agreements (both on the initiator as well as on the responder side) proves unsatisfied, i.e. a trace was found for both lemmas. The previous non-injective agreement lemma now succeeds, i.e. no trace was found. It is included in the theory as \emph{NonInjectiveAgreementInitiatorOld}.
 
-As per tamarin-prover, an adversary is able to generate many key-pairs and create many agents A and B, which will simulate the various steps in the protocol, because there is no real link between the agent and its role, e.g. a malicious agent A can simulate being in the responder role and the same is valid for a malicious agent B in the initiator role. See \emph{OTR3.spthy}.
+As per tamarin-prover, an adversary is able to generate many key-pairs and create many agents A and B, which will simulate the various steps in the protocol, because there is no real link between the agent and its role, e.g. a malicious agent A can simulate being in the responder role and the same is valid for a malicious agent B in the initiator role.\\
+See \emph{OTR3.spthy}.
 
-But by adding the role in the agent's signature, e.g. by replacing agent A's  $sign\{g^x, B\}_{sk(A)}$  by  $sign\{I, g^x, B\}_{sk(A)}$(and the same for agent B), the non-injective agreement lemmas for both initiator and recipient now succeed. And the secrecy and forward secrecy lemmas also succeed. Unfortunately the injective agreement lemmas for both roles do fail as the specified protocol doesn't prevent an agent A to communicate with two agent B and vice versa. See \emph{OTR3\_B.spthy}.
+But by adding the role in the agent's signature, e.g. by replacing agent A's  $sign\{g^x, B\}_{sk(A)}$  by  $sign\{I, g^x, B\}_{sk(A)}$(and the same for agent B), the non-injective agreement lemmas for both initiator and recipient now succeed. And the secrecy and forward secrecy lemmas also succeed. Unfortunately the injective agreement lemmas for both roles do fail as the specified protocol doesn't prevent an agent A to communicate with two agent B and vice versa. \\
+See \emph{OTR3\_B.spthy}.
 
-As an experiment, we modified the signed Diffie-Hellman theory seen in the exercise session to include the authentication lemmas (non-injective and injective) and there too the non injective agreement lemmas succeed but the injective ones fail. See \emph{ex33\_SDH\_mod.spthy}.
+As an experiment, we modified the signed Diffie-Hellman theory seen in the exercise session to include the authentication lemmas (non-injective and injective) and there too the non injective agreement lemmas succeed but the injective ones fail. \\
+See \emph{ex33\_SDH\_mod.spthy}.
 
 \newpage
 \hypertarget{sigma}{%
@@ -160,7 +163,11 @@ The analysis of the protocol shows that the following lemma succeed:
     \item forward secrecy.
 \end{itemize}
 
-But the non-injective agreement responder fails. In the trace, one can see that the adversary can fool an honest agent B by creating a malicious agent A which intercepts the messages send by the honest agent A and also takes the responder role to fool the honest agent A.
+But the non-injective agreement responder fails. In the trace, one can see that the adversary can fool an honest agent B by creating a malicious agent A which intercepts the messages send by the honest agent A and also takes the responder role to fool the honest agent A.\\
+See \emph{OTR4.spthy}
 
-To be completed
+Contrary to the \emph{OTR3\_B} improvements, adding the role in the agent's signature doesn't resolve the issue; there is still a trace found for the non-injective agreement responder lemma. Our guess is that because the first message from agent A to agent B is not authenticated, it will be always possible for an adversary to create some doubt on the identity of the sender of the first message. In \emph{OTR3\_B}, the first message was signed by the agent.\\
+See \emph{OTR4\_B.spthy}
+
+
 \end{document}
