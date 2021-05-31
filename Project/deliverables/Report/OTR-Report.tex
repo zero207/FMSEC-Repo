@@ -61,7 +61,7 @@
 In the given paper, the key-exchange protocol is described as follows:
 
 \begin{quote}
-In order to add authentication to the basic DH protocol, OTR uses public keys and digital signatures. Specifically, each party A in the OTR network has a pair of secret/public keys ($sk_A$ , $vk_A$ ) for a digital signature scheme (implemented using either DSA or RSA signatures).
+In order to add authentication to the basic DH protocol, OTR uses public keys and digital signatures. Specifically, each party $A$  in the OTR network has a pair of secret/public keys ($sk_A$ , $vk_A$ ) for a digital signature scheme (implemented using either DSA or RSA signatures).
 \end{quote}
 
 \begin{quote}
@@ -79,24 +79,23 @@ A \leftarrow B : Sign_{sk_b(g^y)}, vk_B
 \end{quote}
 
 \begin{quote}
-If the public key $vk_A$ is already stored by B and it is associated with the identity of A, this assures B that $g^x$ comes from A and vice versa (in the absence of pre-stored public keys the protocol could use PK certificates). After the verification of the signatures, both parties compute their shared secret value $g^{xy}$ and erase the DH exponents.
+If the public key $vk_A$ is already stored by $B$ and it is associated with the identity of $A$ , this assures $B$ that $g^x$ comes from $A$ and vice versa (in the absence of pre-stored public keys the protocol could use PK certificates). After the verification of the signatures, both parties compute their shared secret value $g^{xy}$ and erase the DH exponents.
 \end{quote}
 
 In the protocol theory, we use the builtins ``signing'' and
-``diffie-hellman'', which include the necessary functions and equations for the protocol. We then use the Key-generation rule to generate key-pairs $sk_x$ (signing key) and $pk_x$ (verification key). Then we use Initialisation rules to create the agents A and B so each agent knows its partner's pk (A know $pk_B$ and B knows $pk_A$) from beginning on (as specified in the above description).
+``diffie-hellman'', which include the necessary functions and equations for the protocol. We then use the Key-generation rule to generate key-pairs $sk_x$ (signing key) and $pk_x$ (verification key). Then we use Initialisation rules to create the agents $A$ and $B$ so each agent knows its partner's pk ($A$ know $pk_B$ and $B$ knows $pk_A$) from beginning on (as specified in the above description).
 
 We then implement the protocol as follows:
 
 \[ \text{1.} \quad A \rightarrow B: g^x, sign\{g^x\}_{sk(A)}, pk(A) \]
 \[ \text{2.} \quad B \rightarrow A: g^y, sign\{g^y\}_{sk(B)}, pk(B) \]
 
-Where \emph{g} is a fixed constant to represent the generator,
-\emph{x} and \emph{y} are fresh values for the ephemeral keys and
-sk(x) and pk(x) are the key-pairs generated for each agent.
+Where $g$ is a fixed constant to represent the generator, $x$ and $y$ are fresh values for the ephemeral keys and
+$ sk(x)$ and $pk(x)$ are the key-pairs generated for each agent.
 
-In order to model the executable lemma, we add \emph{Finish} statements at the end of the protocol for each agent; we also make sure that a message received by A corresponds to a message sent by B, that only one agent A and one agent B are created and finally that agent A and agent B are different.
+In order to model the executable lemma, we add \emph{Finish} statements at the end of the protocol for each agent; we also make sure that a message received by $A$ corresponds to a message sent by B, that only one agent $A$ and one agent $B$ are created and finally that agent $A$ and agent $B$ are different.
 
-See \emph{OTR1.spthy}
+See \texttt{OTR1.spthy}
 
 \newpage
 \hypertarget{attack-on-authentication}{%
@@ -109,17 +108,19 @@ The ``man in the middle'' attack presented in the paper looks as follows:
 \[ E \leftarrow B : g^y, Sign_{sk_B} (g^y), vk_B \]
 \[ A \leftarrow E[B] : g^y, Sign_{sk_B} (g_y), vk_B \]
 
-The adversary E impersonates B for A (hence the notation E[B] for the communication between A and E) and then forwards $g^x$ to B but signed with E's key. B then replies to E by sending $g^y$ signed by B's key and E forwards this message to A.
+The adversary $E$ impersonates $B$ for $A$ (hence the notation $E[B]$ for the communication between $A$ and $E$) and then forwards $g^x$ to $B$ but signed with $E$'s key. $B$ then replies to $E$ by sending $g^y$ signed by B's key and $E$ forwards this message to $A$.
 
-We were able to reproduce a similar attack in tamarin by restricting the creation of only one agent A and  max. two agents B (one representing the man in the middle E), but this attack is not quite the one described previously. In this attack, because the agent B is only able to send a fresh $g^y$ (where \emph{y} is fresh), E[B] cannot forward $g^x$ to B, but sends its own $g^z$ to B; in the same manner E[B] cannot forward B's reply to A and so the attack in tamarin looks as follows:
+We were able to reproduce a similar attack in tamarin by restricting the creation of only one agent $A$ and  max. two agents $B$ (one representing the man in the middle $E$), but this attack is not quite the one described previously. In this attack, because the agent $B$ is only able to send a fresh $g^y$ (where $y$ is fresh), $E[B]$ cannot forward $g^x$ to B, but sends its own $g^z$ to B; in the same manner $E[B]$ cannot forward B's reply to $A$ and so the attack in tamarin looks as follows:
 
-\[ A \rightarrow E[B] : g^x, Sign_{sk_A} (g^x), vk_A \]
-\[ E \rightarrow B : g^z, Sign_{sk_E} (g^z), vk_E \]
-\[ B \rightarrow A : g^y, Sign_{sk_B} (g^y), vk_B \]
+\[ A \rightarrow E[B] : g^x, sign\{g^x\}_{sk(A)}, pk(A) \]
+\[ E \rightarrow B : g^z, sign\{g^z\}_{sk(E), pk(E)} \]
+\[ B \rightarrow A : g^y, sign\{g^y\}_{sk(B)}, pk(B) \]
 
-So at the end A and B won't be able to communicate because the resulting key is different for A and B ($g^{xy}$ for A and $g^{zy }$) for B.
 
-See \emph{OTR2.spthy}
+
+So at the end $A$ and $B$ won't be able to communicate because the resulting key is different for $A$ and $B$ ($g^{xy}$ for $A$ and $g^{zy}$ for B).
+
+See \texttt{OTR2.spthy}
 
 \newpage
 \hypertarget{improvement}{%
@@ -132,11 +133,11 @@ We implement the improvement as described in the OTR paper in section 3.1 as fol
 
 and the analysis of the new protocol with the standard non-injective agreements (both on the initiator as well as on the responder side) proves unsatisfied, i.e. a trace was found for both lemmas. The previous non-injective agreement lemma now succeeds, i.e. no trace was found. It is included in the theory as \emph{NonInjectiveAgreementInitiatorOld}.
 
-As per tamarin-prover, an adversary is able to generate many key-pairs and create many agents A and B, which will simulate the various steps in the protocol, because there is no real link between the agent and its role, e.g. a malicious agent A can simulate being in the responder role and the same is valid for a malicious agent B in the initiator role.\\
-See \emph{OTR3.spthy}.
+As per tamarin-prover, an adversary is able to generate many key-pairs and create many agents $A$ and B, which will simulate the various steps in the protocol, because there is no real link between the agent and its role, e.g. a malicious agent $A$ can simulate being in the responder role and the same is valid for a malicious agent $B$ in the initiator role.\\
+See \texttt{OTR3.spthy}.
 
-But by adding the role in the agent's signature, e.g. by replacing agent A's  $sign\{g^x, B\}_{sk(A)}$  by  $sign\{I, g^x, B\}_{sk(A)}$(and the same for agent B), the non-injective agreement lemmas for both initiator and recipient now succeed. And the secrecy and forward secrecy lemmas also succeed. Unfortunately the injective agreement lemmas for both roles do fail as the specified protocol doesn't prevent an agent A to communicate with two agent B and vice versa. \\
-See \emph{OTR3\_B.spthy}.
+But by adding the role in the agent's signature, e.g. by replacing agent A's  $sign\{g^x, B\}_{sk(A)}$  by  $sign\{I, g^x, B\}_{sk(A)}$(and the same for agent B), the non-injective agreement lemmas for both initiator and recipient now succeed. And the secrecy and forward secrecy lemmas also succeed. Unfortunately the injective agreement lemmas for both roles do fail as the specified protocol doesn't prevent an agent $A$ to communicate with two agent $B$ and vice versa. \\
+See \texttt{OTR3\_B.spthy}.
 
 As an experiment, we modified the signed Diffie-Hellman theory seen in the exercise session to include the authentication lemmas (non-injective and injective) and there too the non injective agreement lemmas succeed but the injective ones fail. \\
 See \emph{ex33\_SDH\_mod.spthy}.
@@ -163,11 +164,11 @@ The analysis of the protocol shows that the following lemma succeed:
     \item forward secrecy.
 \end{itemize}
 
-But the non-injective agreement responder fails. In the trace, one can see that the adversary can fool an honest agent B by creating a malicious agent A which intercepts the messages send by the honest agent A and also takes the responder role to fool the honest agent A.\\
-See \emph{OTR4.spthy}
+But the non-injective agreement responder fails. In the trace, one can see that the adversary can fool an honest agent $B$ by creating a malicious agent $A$ which intercepts the messages send by the honest agent $A$ and also takes the responder role to fool the honest agent $A$.\\
+See \texttt{OTR4.spthy}
 
-Contrary to the \emph{OTR3\_B} improvements, adding the role in the agent's signature doesn't resolve the issue; there is still a trace found for the non-injective agreement responder lemma. Our guess is that because the first message from agent A to agent B is not authenticated, it will be always possible for an adversary to create some doubt on the identity of the sender of the first message. In \emph{OTR3\_B}, the first message was signed by the agent.\\
-See \emph{OTR4\_B.spthy}
+Contrary to the \texttt{OTR3\_B} improvements, adding the role in the agent's signature doesn't resolve the issue; there is still a trace found for the non-injective agreement responder lemma. Our guess is that because the first message from agent $A$ to agent $B$ is not authenticated, it will be always possible for an adversary to create some doubt on the identity of the sender of the first message. In \texttt{OTR3\_B}, the first message was signed by the agent.\\
+See \texttt{OTR4\_B.spthy}
 
 
 \end{document}
