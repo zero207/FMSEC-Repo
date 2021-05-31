@@ -7,8 +7,8 @@ functions: mac/2, h/1, map/2
 /*
 1. A -> B: g^x, p, {|s|}_h(k(A,B))
 2. B -> A: g^y
-3. A -> B: ['A', g^y]_(h(g^xy)
-4. B -> A: ['B', g^x]_(h(g^xy)
+3. A -> B: ['roleA', g^y]_(h(g^xy)
+4. B -> A: ['roleB', g^x]_(h(g^xy)
 */
 
 // Shared key infrastructure rules
@@ -77,32 +77,32 @@ rule A_2_receive:
     --[ Recv(A, B, Y)]->
     [ St_A_3(A, id, B, kAB, p, x, s, Y) ]
 
-//A sends message mY (MAC of <'A', Y> with session key)
+//A sends message mY (MAC of <'roleA', Y> with session key)
 rule A_3_send:
     let g = 'd'
          Kab = h(Y^x) //Kab is the session key
-         mY = mac(Kab, <'A', Y>) in
+         mY = mac(Kab, <'roleA', Y>) in
     [ St_A_3(A, id, B, kAB, p, x, s, Y) ]
     --[ Send(A, B,  mY)
     , Running(A, B, <'R', 'I', g^x, Y>) ]->
     [ St_A_4(A, id, B, kAB, p, x, s, Y), Out(mY) ]
 
-//B receives message mY (MAC of <'A', Y> with session key)
+//B receives message mY (MAC of <'roleA', Y> with session key)
 rule B_3_receive:
     let g = 'd'
          Kab = h(X^y)
-         mY = mac(Kab, <'A', g^y>) in
+         mY = mac(Kab, <'roleA', g^y>) in
     [ St_B_3(B, id, A, kAB, X, p, s, y)
     , In(mY) ]
     --[ Recv(B, A,  mY)
       , Commit(B, A, <'R', 'I', X, g^y>) ]->
     [ St_B_4(B, id, A, kAB, X, p, s, y) ]
 
-//B sends message mX (MAC of <'B', X> with session key)
+//B sends message mX (MAC of <'roleB', X> with session key)
 rule B_4_send:
     let g = 'd'
          Kab = h(X^y) //Kab is the session key
-         mX = mac(Kab, <'B', X>) in
+         mX = mac(Kab, <'roleB', X>) in
     [ St_B_4(B, id, A, kAB, X, p, s, y) ]
     --[ Send(B, A,  mX)
     , Running(B, A, <'I', 'R', X, g^y>)
@@ -112,11 +112,11 @@ rule B_4_send:
     , Finish(B) ]->
     [ St_B_5(B, id, A, kAB, X, p, s, y), Out(mX) ]
 
-//A receives message mX (MAC of <'B', X> with session key)
+//A receives message mX (MAC of <'roleB', X> with session key)
 rule A_4_receive:
     let g = 'd'
          Kab = h(Y^x)
-         mX = mac(Kab, <'B', g^x>) in
+         mX = mac(Kab, <'roleB', g^x>) in
     [ St_A_4(A, id, B, kAB, p, x, s, Y)
     , In(mX) ]
     --[ Recv(A, B,  mX)

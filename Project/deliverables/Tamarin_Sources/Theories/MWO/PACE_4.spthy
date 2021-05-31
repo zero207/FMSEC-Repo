@@ -7,8 +7,8 @@ functions: mac/2, kdf/3, h/1
 /*
 1. A -> B: x, {s}_h(k(A,B))
 2. B -> A: y
-3. A -> B: ['A', y]_kdf(s, x, y)
-4. B -> A: ['B', x]_kdf(s, x, y)
+3. A -> B: ['roleA', y]_kdf(s, x, y)
+4. B -> A: ['roleB', x]_kdf(s, x, y)
 */
 
 // Shared key infrastructure rules
@@ -76,28 +76,28 @@ rule B_2_receive:
     --[ Recv(B, A, msg)]->
     [ St_B_3(B, id, A, y, kAB, x, s) ]
 
-//A sends message my (MAC of <'A', y> with session key)
+//A sends message my (MAC of <'roleA', y> with session key)
 rule A_3_send:
     let Kab = kdf(s, x, y) // Kab is the session key
-         my = mac(Kab, <'A', y>) in
+         my = mac(Kab, <'roleA', y>) in
     [ St_A_3(A, id, B, x, s, kAB, y) ]
     --[ Send(A, B,  my)
     , Running(A, B, <'R', 'I', x, y>) ]->
     [ St_A_4(A, id, B, x, s, kAB, y), Out(my) ]
 
-//B sends message mx (MAC of <'B', x> with session key)
+//B sends message mx (MAC of <'roleB', x> with session key)
 rule B_3_send:
     let Kab = kdf(s, x, y) // Kab is the session key
-         mx = mac(Kab, <'B', x>) in
+         mx = mac(Kab, <'roleB', x>) in
     [ St_B_3(B, id, A, y, kAB, x, s) ]
     --[ Send(B, A,  mx)
     , Running(B, A, <'I', 'R', x, y>) ]->
     [ St_B_4(B, id, A, y, kAB, x, s), Out(mx) ]
 
-//A receives message mx (MAC of <'B', x> with session key)
+//A receives message mx (MAC of <'roleB', x> with session key)
 rule A_4_receive:
     let Kab = kdf(s, x, y)
-         mx = mac(Kab, <'B', x>) in
+         mx = mac(Kab, <'roleB', x>) in
     [ St_A_4(A, id, B, x, s, kAB, y)
     , In(mx) ]
     --[ Recv(A, B,  mx)
@@ -108,10 +108,10 @@ rule A_4_receive:
       , Finish(A) ]->
     [ St_A_5(A, id, B, x, s, kAB, y) ]
 
-//B receives message my (MAC of <'A', y> with session key)
+//B receives message my (MAC of <'roleA', y> with session key)
 rule B_4_receive:
     let Kab = kdf(s, x, y)
-         my = mac(Kab, <'A', y>) in
+         my = mac(Kab, <'roleA', y>) in
     [ St_B_4(B, id, A, y, kAB, x, s)
     , In(my) ]
     --[ Recv(B, A,  my)
