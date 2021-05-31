@@ -127,7 +127,6 @@ lemma executable:
        & not (Ex X #k. Rev(X)@k)
     "
 
-// fails
 lemma nonInjectiveAgreementInitiator:
   "All a b t #i.
     Commit(a, b, <'I','R',t>)@i
@@ -135,7 +134,6 @@ lemma nonInjectiveAgreementInitiator:
     | (Ex X #r. Rev(X)@r & Honest(X)@i)
 "
 
-// fails
 lemma nonInjectiveAgreementResponder:
      "All a b t #i.
     Commit(a, b, <'R','I',t>)@i
