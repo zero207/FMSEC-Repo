@@ -94,7 +94,7 @@ The trace found by tamarin-prover for the non-injective agreement initiator lemm
 &E \rightarrow B: x\\
 &B \rightarrow E: y\\
 &E[A] \rightarrow A: z (*)\\
-&E[A] \rightarrow B: [y]_{k(B,A)}\\
+&E \rightarrow B: [y]_{k(B,A)}\\
 &B \rightarrow E: [x]_{k(A,B)}\\
 &E[A]\rightarrow A: [x]_{k(A,B)} (**)
 \end{align*}
@@ -105,7 +105,7 @@ The trace found by tamarin-prover for the non-injective agreement initiator lemm
 
 For the non-injective agreement responder lemma, the trace can be described as follows: The intruder intercepts the nonce $x$ from $A$ and sends its own nonce $z$ to $B$. Afterwards $B$ communicates directly wit $A$, and when $B$ receives back its nonce $y$ MACed with the correct key, it concludes (wrongly) that both nonces $y$ and $z$ are authenticated.
 
-\item We have solved the problem in protocol 2(a) by adding the identifiers 'roleA' and 'roleB' to the participant's nonces on the MAC'ed message.  Thus, the property of the injective agreement now holds for both.
+\item We have solved the problem in protocol 2(a) by adding the identifiers 'roleA' and 'roleB' to the participant's nonces on the MACed message.  Thus, the property of the injective agreement now holds for both.
 
 \begin{align*}
 &A \rightarrow B: x\\
