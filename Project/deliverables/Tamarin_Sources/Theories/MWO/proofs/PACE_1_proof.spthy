@@ -1,0 +1,135 @@
+theory PACE_1 begin
+
+// Function signature and definition of the equational theory E
+
+functions: fst/1, mac/2, pair/2, snd/1
+equations: fst(<x.1, x.2>) = x.1, snd(<x.1, x.2>) = x.2
+
+
+
+rule (modulo E) Register_shared_kAB:
+   [ Fr( ~kAB ) ] --> [ !LtMac( $A, $B, ~kAB ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Reveal_shk_A:
+   [ !LtMac( A, B, kAB ) ] --[ Rev( A ) ]-> [ Out( kAB ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Reveal_shk_B:
+   [ !LtMac( A, B, kAB ) ] --[ Rev( B ) ]-> [ Out( kAB ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Initialise_A:
+   [ Fr( ~id ), !LtMac( A, B, kAB ) ]
+  --[ Create_A( A, ~id, 'roleA' ) ]->
+   [ St_A_1( A, ~id, B, kAB ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Initialise_B:
+   [ Fr( ~id ), !LtMac( A, B, kAB ) ]
+  --[ Create_B( B, ~id, 'roleB' ) ]->
+   [ St_B_1( B, ~id, A, kAB ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) A_send:
+   [ Fr( ~x ), St_A_1( A, id, B, kAB ) ]
+  --[ Send( A, B, ~x ) ]->
+   [ St_A_2( A, id, B, ~x, kAB ), Out( ~x ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) B_receive:
+   [ St_B_1( B, id, A, kAB ), In( x ) ]
+  --[ Recv( B, A, x ) ]->
+   [ St_B_2( B, id, A, x, kAB ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) B_send:
+   [ St_B_2( B, id, A, x, kAB ) ]
+  --[
+  Send( B, A, mac(kAB, x) ),
+  Running( B, A, <'A', 'B', mac(kAB, x)> ), Honest( A ), Honest( B )
+  ]->
+   [ St_B_3( B, id, A, x, kAB ), Out( mac(kAB, x) ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) A_receive:
+   [ St_A_2( A, id, B, x, kAB ), In( mac(kAB, x) ) ]
+  --[
+  Recv( A, B, mac(kAB, x) ), Commit( A, B, <'A', 'B', mac(kAB, x)> ),
+  Honest( A ), Honest( B )
+  ]->
+   [ St_A_3( A, id, B, x, kAB ) ]
+
+  /* has exactly the trivial AC variant */
+
+lemma executable:
+  exists-trace
+  "∃ A B m #i.
+    (((Recv( A, B, m ) @ #i) ∧ (¬(A = B))) ∧
+     (¬(∃ #k. Rev( A ) @ #k))) ∧
+    (¬(∃ #k. Rev( B ) @ #k))"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ A B m #i.
+  (Recv( A, B, m ) @ #i)
+ ∧
+  (¬(A = B)) ∧
+  (∀ #k. (Rev( A ) @ #k) ⇒ ⊥) ∧
+  (∀ #k. (Rev( B ) @ #k) ⇒ ⊥)"
+*/
+simplify
+solve( Recv( A, B, m ) @ #i )
+  case B_receive
+  solve( St_B_1( A, id, B, kAB ) ▶₀ #i )
+    case Initialise_B
+    SOLVED // trace found
+  qed
+qed
+
+lemma injectiveAgreement:
+  all-traces
+  "∀ a b t #i.
+    (Commit( a, b, <'A', 'B', t> ) @ #i) ⇒
+    ((∃ #j.
+       (Running( b, a, <'A', 'B', t> ) @ #j) ∧
+       (¬(∃ a2 b2 #i2.
+           (Commit( a2, b2, <'I', 'R', t> ) @ #i2) ∧ (¬(#i2 = #i))))) ∨
+     (∃ X #r. (Rev( X ) @ #r) ∧ (Honest( X ) @ #i)))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ a b t #i.
+  (Commit( a, b, <'A', 'B', t> ) @ #i)
+ ∧
+  (∀ #j.
+    (Running( b, a, <'A', 'B', t> ) @ #j)
+   ⇒
+    ∃ a2 b2 #i2.
+     (Commit( a2, b2, <'I', 'R', t> ) @ #i2) ∧ ¬(#i2 = #i)) ∧
+  (∀ X #r. (Rev( X ) @ #r) ∧ (Honest( X ) @ #i) ⇒ ⊥)"
+*/
+simplify
+solve( St_A_2( a, id, b, x, kAB ) ▶₀ #i )
+  case A_send
+  solve( !KU( mac(~kAB, ~x) ) @ #vk )
+    case c_mac
+    solve( !KU( ~kAB ) @ #vk.1 )
+      case Reveal_shk_A
+      by contradiction /* from formulas */
+    next
+      case Reveal_shk_B
+      by contradiction /* from formulas */
+    qed
+  qed
+qed
+
+/* All well-formedness checks were successful. */
+
+end

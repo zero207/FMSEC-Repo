@@ -1,0 +1,1314 @@
+theory PACE_5d_pubg begin
+
+// Function signature and definition of the equational theory E
+
+builtins: diffie-hellman
+functions: fst/1, h/1, mac/2, map/2, pair/2, sdec/2, senc/2, snd/1
+equations:
+    fst(<x.1, x.2>) = x.1,
+    sdec(senc(x.1, x.2), x.2) = x.1,
+    snd(<x.1, x.2>) = x.2
+
+
+
+rule (modulo E) Register_shared_key:
+   [ Fr( ~kAB ) ] --> [ !LtMac( $A, $B, ~kAB ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Reveal_shk_A:
+   [ !LtMac( A, B, kAB ) ] --[ Rev( A ) ]-> [ Out( kAB ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Reveal_shk_B:
+   [ !LtMac( A, B, kAB ) ] --[ Rev( B ) ]-> [ Out( kAB ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Initialise_A:
+   [ Fr( ~id ), !LtMac( A, B, kAB ) ]
+  --[ Create_A( A, ~id, 'roleA' ) ]->
+   [ St_A_1( A, ~id, B, kAB, $p ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Initialise_B:
+   [ Fr( ~id ), !LtMac( A, B, kAB ) ]
+  --[ Create_B( B, ~id, 'roleB' ) ]->
+   [ St_B_1( B, ~id, A, kAB ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) A_1_send:
+   [ Fr( ~x ), Fr( ~s ), St_A_1( A, id, B, kAB, p ) ]
+  --[ Send( A, B, <'d'^~x, p, senc(~s, h(kAB))> ) ]->
+   [
+   St_A_2( A, id, B, kAB, p, ~x, ~s ),
+   Out( <'d'^~x, p, senc(~s, h(kAB))> )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) B_1_receive:
+   [ St_B_1( B, id, A, kAB ), In( <X, p, senc(s, h(kAB))> ) ]
+  --[ Recv( B, A, <X, p, senc(s, h(kAB))> ) ]->
+   [ St_B_2( B, id, A, kAB, X, p, s ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) B_2_send:
+   [ Fr( ~y ), St_B_2( B, id, A, kAB, X, p, s ) ]
+  --[ Send( B, A, 'd'^~y ), Neq( X, 'd'^~y ) ]->
+   [ St_B_3( B, id, A, kAB, X, p, s, ~y ), Out( 'd'^~y ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) A_2_receive:
+   [ St_A_2( A, id, B, kAB, p, x, s ), In( Y ) ]
+  --[ Recv( A, B, Y ), Neq( 'd'^x, Y ) ]->
+   [ St_A_3( A, id, B, kAB, p, x, s, Y ) ]
+
+  /*
+  rule (modulo AC) A_2_receive:
+     [ St_A_2( A, id, B, kAB, p, x, s ), In( Y ) ]
+    --[ Recv( A, B, Y ), Neq( z, Y ) ]->
+     [ St_A_3( A, id, B, kAB, p, x, s, Y ) ]
+    variants (modulo AC)
+    1. x     = x.10
+       z     = 'd'^x.10
+    
+    2. x     = one
+       z     = 'd'
+  */
+
+rule (modulo E) A_3_send:
+   [ St_A_3( A, id, B, kAB, p, x, s, Y ) ]
+  --[
+  Send( A, B, mac(h(Y^x), Y) ), Running( A, B, <'R', 'I', 'd'^x, Y> )
+  ]->
+   [ St_A_4( A, id, B, kAB, p, x, s, Y ), Out( mac(h(Y^x), Y) ) ]
+
+  /*
+  rule (modulo AC) A_3_send:
+     [ St_A_3( A, id, B, kAB, p, x, s, Y ) ]
+    --[ Send( A, B, mac(h(z), Y) ), Running( A, B, <'R', 'I', z.1, Y> )
+    ]->
+     [ St_A_4( A, id, B, kAB, p, x, s, Y ), Out( mac(h(z), Y) ) ]
+    variants (modulo AC)
+     1. Y     = Y.14
+        x     = one
+        z     = Y.14
+        z.1   = 'd'
+    
+     2. Y     = Y.19
+        x     = x.24
+        z     = Y.19^x.24
+        z.1   = 'd'^x.24
+    
+     3. Y     = x.16^(x.17*x.18)
+        x     = inv(x.17)
+        z     = x.16^x.18
+        z.1   = 'd'^inv(x.17)
+    
+     4. Y     = z.16^inv(x.15)
+        x     = x.15
+        z     = z.16
+        z.1   = 'd'^x.15
+    
+     5. Y     = x.17^(x.18*x.19*inv(x.20))
+        x     = (x.20*inv(x.18))
+        z     = x.17^x.19
+        z.1   = 'd'^(x.20*inv(x.18))
+    
+     6. Y     = x.17^(x.18*inv((x.19*x.20)))
+        x     = (x.19*inv(x.18))
+        z     = x.17^inv(x.20)
+        z.1   = 'd'^(x.19*inv(x.18))
+    
+     7. Y     = x.18^(x.19*x.20*inv((x.21*x.22)))
+        x     = (x.21*inv(x.19))
+        z     = x.18^(x.20*inv(x.22))
+        z.1   = 'd'^(x.21*inv(x.19))
+    
+     8. Y     = z.19^x.28
+        x     = inv(x.28)
+        z     = z.19
+        z.1   = 'd'^inv(x.28)
+    
+     9. Y     = x.20^x.21
+        x     = inv((x.21*x.26))
+        z     = x.20^inv(x.26)
+        z.1   = 'd'^inv((x.21*x.26))
+    
+    10. Y     = x.20^x.21
+        x     = (x.26*inv(x.21))
+        z     = x.20^x.26
+        z.1   = 'd'^(x.26*inv(x.21))
+    
+    11. Y     = x.20^inv(x.21)
+        x     = inv(x.26)
+        z     = x.20^inv((x.21*x.26))
+        z.1   = 'd'^inv(x.26)
+    
+    12. Y     = x.20^inv(x.21)
+        x     = (x.21*x.26)
+        z     = x.20^x.26
+        z.1   = 'd'^(x.21*x.26)
+    
+    13. Y     = z.20^(x.29*inv(x.30))
+        x     = (x.30*inv(x.29))
+        z     = z.20
+        z.1   = 'd'^(x.30*inv(x.29))
+    
+    14. Y     = x.21^x.22
+        x     = (x.27*inv((x.22*x.28)))
+        z     = x.21^(x.27*inv(x.28))
+        z.1   = 'd'^(x.27*inv((x.22*x.28)))
+    
+    15. Y     = x.21^inv(x.22)
+        x     = (x.27*inv(x.28))
+        z     = x.21^(x.27*inv((x.22*x.28)))
+        z.1   = 'd'^(x.27*inv(x.28))
+    
+    16. Y     = x.21^inv((x.22*x.23))
+        x     = (x.22*x.28)
+        z     = x.21^(x.28*inv(x.23))
+        z.1   = 'd'^(x.22*x.28)
+    
+    17. Y     = x.21^inv((x.22*x.23))
+        x     = (x.22*inv(x.28))
+        z     = x.21^inv((x.23*x.28))
+        z.1   = 'd'^(x.22*inv(x.28))
+    
+    18. Y     = x.21^(x.22*x.23)
+        x     = inv((x.22*x.28))
+        z     = x.21^(x.23*inv(x.28))
+        z.1   = 'd'^inv((x.22*x.28))
+    
+    19. Y     = x.21^(x.22*x.23)
+        x     = (x.28*inv(x.22))
+        z     = x.21^(x.23*x.28)
+        z.1   = 'd'^(x.28*inv(x.22))
+    
+    20. Y     = x.21^(x.22*inv(x.23))
+        x     = inv(x.28)
+        z     = x.21^(x.22*inv((x.23*x.28)))
+        z.1   = 'd'^inv(x.28)
+    
+    21. Y     = x.21^(x.22*inv(x.23))
+        x     = inv((x.22*x.28))
+        z     = x.21^inv((x.23*x.28))
+        z.1   = 'd'^inv((x.22*x.28))
+    
+    22. Y     = x.21^(x.22*inv(x.23))
+        x     = (x.23*x.28)
+        z     = x.21^(x.22*x.28)
+        z.1   = 'd'^(x.23*x.28)
+    
+    23. Y     = x.21^(x.22*inv(x.23))
+        x     = (x.23*x.28*inv(x.22))
+        z     = x.21^x.28
+        z.1   = 'd'^(x.23*x.28*inv(x.22))
+    
+    24. Y     = x.21^(x.22*inv(x.23))
+        x     = (x.23*inv((x.22*x.28)))
+        z     = x.21^inv(x.28)
+        z.1   = 'd'^(x.23*inv((x.22*x.28)))
+    
+    25. Y     = x.22^inv((x.23*x.24))
+        x     = (x.23*x.29*inv(x.30))
+        z     = x.22^(x.29*inv((x.24*x.30)))
+        z.1   = 'd'^(x.23*x.29*inv(x.30))
+    
+    26. Y     = x.22^(x.23*x.24)
+        x     = (x.29*inv((x.23*x.30)))
+        z     = x.22^(x.24*x.29*inv(x.30))
+        z.1   = 'd'^(x.29*inv((x.23*x.30)))
+    
+    27. Y     = x.22^(x.23*x.24*inv(x.25))
+        x     = inv((x.23*x.30))
+        z     = x.22^(x.24*inv((x.25*x.30)))
+        z.1   = 'd'^inv((x.23*x.30))
+    
+    28. Y     = x.22^(x.23*x.24*inv(x.25))
+        x     = (x.25*x.30*inv(x.23))
+        z     = x.22^(x.24*x.30)
+        z.1   = 'd'^(x.25*x.30*inv(x.23))
+    
+    29. Y     = x.22^(x.23*x.24*inv(x.25))
+        x     = (x.25*inv((x.23*x.30)))
+        z     = x.22^(x.24*inv(x.30))
+        z.1   = 'd'^(x.25*inv((x.23*x.30)))
+    
+    30. Y     = x.22^(x.23*inv(x.24))
+        x     = (x.24*x.29*inv((x.23*x.30)))
+        z     = x.22^(x.29*inv(x.30))
+        z.1   = 'd'^(x.24*x.29*inv((x.23*x.30)))
+    
+    31. Y     = x.22^(x.23*inv(x.24))
+        x     = (x.29*inv(x.30))
+        z     = x.22^(x.23*x.29*inv((x.24*x.30)))
+        z.1   = 'd'^(x.29*inv(x.30))
+    
+    32. Y     = x.22^(x.23*inv(x.24))
+        x     = (x.29*inv((x.23*x.30)))
+        z     = x.22^(x.29*inv((x.24*x.30)))
+        z.1   = 'd'^(x.29*inv((x.23*x.30)))
+    
+    33. Y     = x.22^(x.23*inv((x.24*x.25)))
+        x     = (x.24*x.30)
+        z     = x.22^(x.23*x.30*inv(x.25))
+        z.1   = 'd'^(x.24*x.30)
+    
+    34. Y     = x.22^(x.23*inv((x.24*x.25)))
+        x     = (x.24*x.30*inv(x.23))
+        z     = x.22^(x.30*inv(x.25))
+        z.1   = 'd'^(x.24*x.30*inv(x.23))
+    
+    35. Y     = x.22^(x.23*inv((x.24*x.25)))
+        x     = (x.24*inv(x.30))
+        z     = x.22^(x.23*inv((x.25*x.30)))
+        z.1   = 'd'^(x.24*inv(x.30))
+    
+    36. Y     = x.22^(x.23*inv((x.24*x.25)))
+        x     = (x.24*inv((x.23*x.30)))
+        z     = x.22^inv((x.25*x.30))
+        z.1   = 'd'^(x.24*inv((x.23*x.30)))
+    
+    37. Y     = x.23^(x.24*x.25*inv(x.26))
+        x     = (x.26*x.31*inv((x.24*x.32)))
+        z     = x.23^(x.25*x.31*inv(x.32))
+        z.1   = 'd'^(x.26*x.31*inv((x.24*x.32)))
+    
+    38. Y     = x.23^(x.24*x.25*inv(x.26))
+        x     = (x.31*inv((x.24*x.32)))
+        z     = x.23^(x.25*x.31*inv((x.26*x.32)))
+        z.1   = 'd'^(x.31*inv((x.24*x.32)))
+    
+    39. Y     = x.23^(x.24*x.25*inv((x.26*x.27)))
+        x     = (x.26*x.32*inv(x.24))
+        z     = x.23^(x.25*x.32*inv(x.27))
+        z.1   = 'd'^(x.26*x.32*inv(x.24))
+    
+    40. Y     = x.23^(x.24*x.25*inv((x.26*x.27)))
+        x     = (x.26*inv((x.24*x.32)))
+        z     = x.23^(x.25*inv((x.27*x.32)))
+        z.1   = 'd'^(x.26*inv((x.24*x.32)))
+    
+    41. Y     = x.23^(x.24*inv((x.25*x.26)))
+        x     = (x.25*x.31*inv(x.32))
+        z     = x.23^(x.24*x.31*inv((x.26*x.32)))
+        z.1   = 'd'^(x.25*x.31*inv(x.32))
+    
+    42. Y     = x.23^(x.24*inv((x.25*x.26)))
+        x     = (x.25*x.31*inv((x.24*x.32)))
+        z     = x.23^(x.31*inv((x.26*x.32)))
+        z.1   = 'd'^(x.25*x.31*inv((x.24*x.32)))
+    
+    43. Y     = x.24^(x.25*x.26*inv((x.27*x.28)))
+        x     = (x.27*x.33*inv((x.25*x.34)))
+        z     = x.24^(x.26*x.33*inv((x.28*x.34)))
+        z.1   = 'd'^(x.27*x.33*inv((x.25*x.34)))
+    
+    44. Y     = x.30^x.31
+        x     = x.20
+        z     = x.30^(x.20*x.31)
+        z.1   = 'd'^x.20
+    
+    45. Y     = x.30^(x.31*inv(x.20))
+        x     = x.20
+        z     = x.30^x.31
+        z.1   = 'd'^x.20
+    
+    46. Y     = x.31^inv((x.21*x.33))
+        x     = x.21
+        z     = x.31^inv(x.33)
+        z.1   = 'd'^x.21
+    
+    47. Y     = x.32^(x.33*inv((x.22*x.35)))
+        x     = x.22
+        z     = x.32^(x.33*inv(x.35))
+        z.1   = 'd'^x.22
+  */
+
+rule (modulo E) B_3_receive:
+   [ St_B_3( B, id, A, kAB, X, p, s, y ), In( mac(h(X^y), 'd'^y) ) ]
+  --[
+  Recv( B, A, mac(h(X^y), 'd'^y) ),
+  Commit( B, A, <'R', 'I', X, 'd'^y> )
+  ]->
+   [ St_B_4( B, id, A, kAB, X, p, s, y ) ]
+
+  /*
+  rule (modulo AC) B_3_receive:
+     [ St_B_3( B, id, A, kAB, X, p, s, y ), In( mac(h(z), z.1) ) ]
+    --[
+    Recv( B, A, mac(h(z), z.1) ), Commit( B, A, <'R', 'I', X, z.1> )
+    ]->
+     [ St_B_4( B, id, A, kAB, X, p, s, y ) ]
+    variants (modulo AC)
+     1. X     = X.12
+        y     = one
+        z     = X.12
+        z.1   = 'd'
+    
+     2. X     = X.17
+        y     = y.22
+        z     = X.17^y.22
+        z.1   = 'd'^y.22
+    
+     3. X     = x.14^(x.15*x.16)
+        y     = inv(x.15)
+        z     = x.14^x.16
+        z.1   = 'd'^inv(x.15)
+    
+     4. X     = z.14^inv(y.13)
+        y     = y.13
+        z     = z.14
+        z.1   = 'd'^y.13
+    
+     5. X     = x.15^(x.16*x.17*inv(x.18))
+        y     = (x.18*inv(x.16))
+        z     = x.15^x.17
+        z.1   = 'd'^(x.18*inv(x.16))
+    
+     6. X     = x.15^(x.16*inv((x.17*x.18)))
+        y     = (x.17*inv(x.16))
+        z     = x.15^inv(x.18)
+        z.1   = 'd'^(x.17*inv(x.16))
+    
+     7. X     = x.16^(x.17*x.18*inv((x.19*x.20)))
+        y     = (x.19*inv(x.17))
+        z     = x.16^(x.18*inv(x.20))
+        z.1   = 'd'^(x.19*inv(x.17))
+    
+     8. X     = z.17^x.24
+        y     = inv(x.24)
+        z     = z.17
+        z.1   = 'd'^inv(x.24)
+    
+     9. X     = x.18^x.19
+        y     = inv((x.19*x.24))
+        z     = x.18^inv(x.24)
+        z.1   = 'd'^inv((x.19*x.24))
+    
+    10. X     = x.18^x.19
+        y     = (x.24*inv(x.19))
+        z     = x.18^x.24
+        z.1   = 'd'^(x.24*inv(x.19))
+    
+    11. X     = x.18^inv(x.19)
+        y     = inv(x.24)
+        z     = x.18^inv((x.19*x.24))
+        z.1   = 'd'^inv(x.24)
+    
+    12. X     = x.18^inv(x.19)
+        y     = (x.19*x.24)
+        z     = x.18^x.24
+        z.1   = 'd'^(x.19*x.24)
+    
+    13. X     = z.18^(x.25*inv(x.26))
+        y     = (x.26*inv(x.25))
+        z     = z.18
+        z.1   = 'd'^(x.26*inv(x.25))
+    
+    14. X     = x.19^x.20
+        y     = (x.25*inv((x.20*x.26)))
+        z     = x.19^(x.25*inv(x.26))
+        z.1   = 'd'^(x.25*inv((x.20*x.26)))
+    
+    15. X     = x.19^inv(x.20)
+        y     = (x.25*inv(x.26))
+        z     = x.19^(x.25*inv((x.20*x.26)))
+        z.1   = 'd'^(x.25*inv(x.26))
+    
+    16. X     = x.19^inv((x.20*x.21))
+        y     = (x.20*x.26)
+        z     = x.19^(x.26*inv(x.21))
+        z.1   = 'd'^(x.20*x.26)
+    
+    17. X     = x.19^inv((x.20*x.21))
+        y     = (x.20*inv(x.26))
+        z     = x.19^inv((x.21*x.26))
+        z.1   = 'd'^(x.20*inv(x.26))
+    
+    18. X     = x.19^(x.20*x.21)
+        y     = inv((x.20*x.26))
+        z     = x.19^(x.21*inv(x.26))
+        z.1   = 'd'^inv((x.20*x.26))
+    
+    19. X     = x.19^(x.20*x.21)
+        y     = (x.26*inv(x.20))
+        z     = x.19^(x.21*x.26)
+        z.1   = 'd'^(x.26*inv(x.20))
+    
+    20. X     = x.19^(x.20*inv(x.21))
+        y     = inv(x.26)
+        z     = x.19^(x.20*inv((x.21*x.26)))
+        z.1   = 'd'^inv(x.26)
+    
+    21. X     = x.19^(x.20*inv(x.21))
+        y     = inv((x.20*x.26))
+        z     = x.19^inv((x.21*x.26))
+        z.1   = 'd'^inv((x.20*x.26))
+    
+    22. X     = x.19^(x.20*inv(x.21))
+        y     = (x.21*x.26)
+        z     = x.19^(x.20*x.26)
+        z.1   = 'd'^(x.21*x.26)
+    
+    23. X     = x.19^(x.20*inv(x.21))
+        y     = (x.21*x.26*inv(x.20))
+        z     = x.19^x.26
+        z.1   = 'd'^(x.21*x.26*inv(x.20))
+    
+    24. X     = x.19^(x.20*inv(x.21))
+        y     = (x.21*inv((x.20*x.26)))
+        z     = x.19^inv(x.26)
+        z.1   = 'd'^(x.21*inv((x.20*x.26)))
+    
+    25. X     = x.20^inv((x.21*x.22))
+        y     = (x.21*x.27*inv(x.28))
+        z     = x.20^(x.27*inv((x.22*x.28)))
+        z.1   = 'd'^(x.21*x.27*inv(x.28))
+    
+    26. X     = x.20^(x.21*x.22)
+        y     = (x.27*inv((x.21*x.28)))
+        z     = x.20^(x.22*x.27*inv(x.28))
+        z.1   = 'd'^(x.27*inv((x.21*x.28)))
+    
+    27. X     = x.20^(x.21*x.22*inv(x.23))
+        y     = inv((x.21*x.28))
+        z     = x.20^(x.22*inv((x.23*x.28)))
+        z.1   = 'd'^inv((x.21*x.28))
+    
+    28. X     = x.20^(x.21*x.22*inv(x.23))
+        y     = (x.23*x.28*inv(x.21))
+        z     = x.20^(x.22*x.28)
+        z.1   = 'd'^(x.23*x.28*inv(x.21))
+    
+    29. X     = x.20^(x.21*x.22*inv(x.23))
+        y     = (x.23*inv((x.21*x.28)))
+        z     = x.20^(x.22*inv(x.28))
+        z.1   = 'd'^(x.23*inv((x.21*x.28)))
+    
+    30. X     = x.20^(x.21*inv(x.22))
+        y     = (x.22*x.27*inv((x.21*x.28)))
+        z     = x.20^(x.27*inv(x.28))
+        z.1   = 'd'^(x.22*x.27*inv((x.21*x.28)))
+    
+    31. X     = x.20^(x.21*inv(x.22))
+        y     = (x.27*inv(x.28))
+        z     = x.20^(x.21*x.27*inv((x.22*x.28)))
+        z.1   = 'd'^(x.27*inv(x.28))
+    
+    32. X     = x.20^(x.21*inv(x.22))
+        y     = (x.27*inv((x.21*x.28)))
+        z     = x.20^(x.27*inv((x.22*x.28)))
+        z.1   = 'd'^(x.27*inv((x.21*x.28)))
+    
+    33. X     = x.20^(x.21*inv((x.22*x.23)))
+        y     = (x.22*x.28)
+        z     = x.20^(x.21*x.28*inv(x.23))
+        z.1   = 'd'^(x.22*x.28)
+    
+    34. X     = x.20^(x.21*inv((x.22*x.23)))
+        y     = (x.22*x.28*inv(x.21))
+        z     = x.20^(x.28*inv(x.23))
+        z.1   = 'd'^(x.22*x.28*inv(x.21))
+    
+    35. X     = x.20^(x.21*inv((x.22*x.23)))
+        y     = (x.22*inv(x.28))
+        z     = x.20^(x.21*inv((x.23*x.28)))
+        z.1   = 'd'^(x.22*inv(x.28))
+    
+    36. X     = x.20^(x.21*inv((x.22*x.23)))
+        y     = (x.22*inv((x.21*x.28)))
+        z     = x.20^inv((x.23*x.28))
+        z.1   = 'd'^(x.22*inv((x.21*x.28)))
+    
+    37. X     = x.21^(x.22*x.23*inv(x.24))
+        y     = (x.24*x.29*inv((x.22*x.30)))
+        z     = x.21^(x.23*x.29*inv(x.30))
+        z.1   = 'd'^(x.24*x.29*inv((x.22*x.30)))
+    
+    38. X     = x.21^(x.22*x.23*inv(x.24))
+        y     = (x.29*inv((x.22*x.30)))
+        z     = x.21^(x.23*x.29*inv((x.24*x.30)))
+        z.1   = 'd'^(x.29*inv((x.22*x.30)))
+    
+    39. X     = x.21^(x.22*x.23*inv((x.24*x.25)))
+        y     = (x.24*x.30*inv(x.22))
+        z     = x.21^(x.23*x.30*inv(x.25))
+        z.1   = 'd'^(x.24*x.30*inv(x.22))
+    
+    40. X     = x.21^(x.22*x.23*inv((x.24*x.25)))
+        y     = (x.24*inv((x.22*x.30)))
+        z     = x.21^(x.23*inv((x.25*x.30)))
+        z.1   = 'd'^(x.24*inv((x.22*x.30)))
+    
+    41. X     = x.21^(x.22*inv((x.23*x.24)))
+        y     = (x.23*x.29*inv(x.30))
+        z     = x.21^(x.22*x.29*inv((x.24*x.30)))
+        z.1   = 'd'^(x.23*x.29*inv(x.30))
+    
+    42. X     = x.21^(x.22*inv((x.23*x.24)))
+        y     = (x.23*x.29*inv((x.22*x.30)))
+        z     = x.21^(x.29*inv((x.24*x.30)))
+        z.1   = 'd'^(x.23*x.29*inv((x.22*x.30)))
+    
+    43. X     = x.22^(x.23*x.24*inv((x.25*x.26)))
+        y     = (x.25*x.31*inv((x.23*x.32)))
+        z     = x.22^(x.24*x.31*inv((x.26*x.32)))
+        z.1   = 'd'^(x.25*x.31*inv((x.23*x.32)))
+    
+    44. X     = x.26^x.27
+        y     = y.18
+        z     = x.26^(y.18*x.27)
+        z.1   = 'd'^y.18
+    
+    45. X     = x.26^(x.27*inv(y.18))
+        y     = y.18
+        z     = x.26^x.27
+        z.1   = 'd'^y.18
+    
+    46. X     = x.27^inv((y.19*x.29))
+        y     = y.19
+        z     = x.27^inv(x.29)
+        z.1   = 'd'^y.19
+    
+    47. X     = x.28^(x.29*inv((y.20*x.31)))
+        y     = y.20
+        z     = x.28^(x.29*inv(x.31))
+        z.1   = 'd'^y.20
+  */
+
+rule (modulo E) B_4_send:
+   [ St_B_4( B, id, A, kAB, X, p, s, y ) ]
+  --[
+  Send( B, A, mac(h(X^y), X) ),
+  Running( B, A, <'I', 'R', X, 'd'^y> ), Secret( B, h(X^y) ),
+  Honest( A ), Honest( B ), Finish( B )
+  ]->
+   [ St_B_5( B, id, A, kAB, X, p, s, y ), Out( mac(h(X^y), X) ) ]
+
+  /*
+  rule (modulo AC) B_4_send:
+     [ St_B_4( B, id, A, kAB, X, p, s, y ) ]
+    --[
+    Send( B, A, mac(h(z), X) ), Running( B, A, <'I', 'R', X, z.1> ),
+    Secret( B, h(z) ), Honest( A ), Honest( B ), Finish( B )
+    ]->
+     [ St_B_5( B, id, A, kAB, X, p, s, y ), Out( mac(h(z), X) ) ]
+    variants (modulo AC)
+     1. X     = X.14
+        y     = one
+        z     = X.14
+        z.1   = 'd'
+    
+     2. X     = X.19
+        y     = y.24
+        z     = X.19^y.24
+        z.1   = 'd'^y.24
+    
+     3. X     = x.16^(x.17*x.18)
+        y     = inv(x.17)
+        z     = x.16^x.18
+        z.1   = 'd'^inv(x.17)
+    
+     4. X     = z.16^inv(y.15)
+        y     = y.15
+        z     = z.16
+        z.1   = 'd'^y.15
+    
+     5. X     = x.17^(x.18*x.19*inv(x.20))
+        y     = (x.20*inv(x.18))
+        z     = x.17^x.19
+        z.1   = 'd'^(x.20*inv(x.18))
+    
+     6. X     = x.17^(x.18*inv((x.19*x.20)))
+        y     = (x.19*inv(x.18))
+        z     = x.17^inv(x.20)
+        z.1   = 'd'^(x.19*inv(x.18))
+    
+     7. X     = x.18^(x.19*x.20*inv((x.21*x.22)))
+        y     = (x.21*inv(x.19))
+        z     = x.18^(x.20*inv(x.22))
+        z.1   = 'd'^(x.21*inv(x.19))
+    
+     8. X     = z.19^x.28
+        y     = inv(x.28)
+        z     = z.19
+        z.1   = 'd'^inv(x.28)
+    
+     9. X     = x.20^x.21
+        y     = inv((x.21*x.26))
+        z     = x.20^inv(x.26)
+        z.1   = 'd'^inv((x.21*x.26))
+    
+    10. X     = x.20^x.21
+        y     = (x.26*inv(x.21))
+        z     = x.20^x.26
+        z.1   = 'd'^(x.26*inv(x.21))
+    
+    11. X     = x.20^inv(x.21)
+        y     = inv(x.26)
+        z     = x.20^inv((x.21*x.26))
+        z.1   = 'd'^inv(x.26)
+    
+    12. X     = x.20^inv(x.21)
+        y     = (x.21*x.26)
+        z     = x.20^x.26
+        z.1   = 'd'^(x.21*x.26)
+    
+    13. X     = z.20^(x.29*inv(x.30))
+        y     = (x.30*inv(x.29))
+        z     = z.20
+        z.1   = 'd'^(x.30*inv(x.29))
+    
+    14. X     = x.21^x.22
+        y     = (x.27*inv((x.22*x.28)))
+        z     = x.21^(x.27*inv(x.28))
+        z.1   = 'd'^(x.27*inv((x.22*x.28)))
+    
+    15. X     = x.21^inv(x.22)
+        y     = (x.27*inv(x.28))
+        z     = x.21^(x.27*inv((x.22*x.28)))
+        z.1   = 'd'^(x.27*inv(x.28))
+    
+    16. X     = x.21^inv((x.22*x.23))
+        y     = (x.22*x.28)
+        z     = x.21^(x.28*inv(x.23))
+        z.1   = 'd'^(x.22*x.28)
+    
+    17. X     = x.21^inv((x.22*x.23))
+        y     = (x.22*inv(x.28))
+        z     = x.21^inv((x.23*x.28))
+        z.1   = 'd'^(x.22*inv(x.28))
+    
+    18. X     = x.21^(x.22*x.23)
+        y     = inv((x.22*x.28))
+        z     = x.21^(x.23*inv(x.28))
+        z.1   = 'd'^inv((x.22*x.28))
+    
+    19. X     = x.21^(x.22*x.23)
+        y     = (x.28*inv(x.22))
+        z     = x.21^(x.23*x.28)
+        z.1   = 'd'^(x.28*inv(x.22))
+    
+    20. X     = x.21^(x.22*inv(x.23))
+        y     = inv(x.28)
+        z     = x.21^(x.22*inv((x.23*x.28)))
+        z.1   = 'd'^inv(x.28)
+    
+    21. X     = x.21^(x.22*inv(x.23))
+        y     = inv((x.22*x.28))
+        z     = x.21^inv((x.23*x.28))
+        z.1   = 'd'^inv((x.22*x.28))
+    
+    22. X     = x.21^(x.22*inv(x.23))
+        y     = (x.23*x.28)
+        z     = x.21^(x.22*x.28)
+        z.1   = 'd'^(x.23*x.28)
+    
+    23. X     = x.21^(x.22*inv(x.23))
+        y     = (x.23*x.28*inv(x.22))
+        z     = x.21^x.28
+        z.1   = 'd'^(x.23*x.28*inv(x.22))
+    
+    24. X     = x.21^(x.22*inv(x.23))
+        y     = (x.23*inv((x.22*x.28)))
+        z     = x.21^inv(x.28)
+        z.1   = 'd'^(x.23*inv((x.22*x.28)))
+    
+    25. X     = x.22^inv((x.23*x.24))
+        y     = (x.23*x.29*inv(x.30))
+        z     = x.22^(x.29*inv((x.24*x.30)))
+        z.1   = 'd'^(x.23*x.29*inv(x.30))
+    
+    26. X     = x.22^(x.23*x.24)
+        y     = (x.29*inv((x.23*x.30)))
+        z     = x.22^(x.24*x.29*inv(x.30))
+        z.1   = 'd'^(x.29*inv((x.23*x.30)))
+    
+    27. X     = x.22^(x.23*x.24*inv(x.25))
+        y     = inv((x.23*x.30))
+        z     = x.22^(x.24*inv((x.25*x.30)))
+        z.1   = 'd'^inv((x.23*x.30))
+    
+    28. X     = x.22^(x.23*x.24*inv(x.25))
+        y     = (x.25*x.30*inv(x.23))
+        z     = x.22^(x.24*x.30)
+        z.1   = 'd'^(x.25*x.30*inv(x.23))
+    
+    29. X     = x.22^(x.23*x.24*inv(x.25))
+        y     = (x.25*inv((x.23*x.30)))
+        z     = x.22^(x.24*inv(x.30))
+        z.1   = 'd'^(x.25*inv((x.23*x.30)))
+    
+    30. X     = x.22^(x.23*inv(x.24))
+        y     = (x.24*x.29*inv((x.23*x.30)))
+        z     = x.22^(x.29*inv(x.30))
+        z.1   = 'd'^(x.24*x.29*inv((x.23*x.30)))
+    
+    31. X     = x.22^(x.23*inv(x.24))
+        y     = (x.29*inv(x.30))
+        z     = x.22^(x.23*x.29*inv((x.24*x.30)))
+        z.1   = 'd'^(x.29*inv(x.30))
+    
+    32. X     = x.22^(x.23*inv(x.24))
+        y     = (x.29*inv((x.23*x.30)))
+        z     = x.22^(x.29*inv((x.24*x.30)))
+        z.1   = 'd'^(x.29*inv((x.23*x.30)))
+    
+    33. X     = x.22^(x.23*inv((x.24*x.25)))
+        y     = (x.24*x.30)
+        z     = x.22^(x.23*x.30*inv(x.25))
+        z.1   = 'd'^(x.24*x.30)
+    
+    34. X     = x.22^(x.23*inv((x.24*x.25)))
+        y     = (x.24*x.30*inv(x.23))
+        z     = x.22^(x.30*inv(x.25))
+        z.1   = 'd'^(x.24*x.30*inv(x.23))
+    
+    35. X     = x.22^(x.23*inv((x.24*x.25)))
+        y     = (x.24*inv(x.30))
+        z     = x.22^(x.23*inv((x.25*x.30)))
+        z.1   = 'd'^(x.24*inv(x.30))
+    
+    36. X     = x.22^(x.23*inv((x.24*x.25)))
+        y     = (x.24*inv((x.23*x.30)))
+        z     = x.22^inv((x.25*x.30))
+        z.1   = 'd'^(x.24*inv((x.23*x.30)))
+    
+    37. X     = x.23^(x.24*x.25*inv(x.26))
+        y     = (x.26*x.31*inv((x.24*x.32)))
+        z     = x.23^(x.25*x.31*inv(x.32))
+        z.1   = 'd'^(x.26*x.31*inv((x.24*x.32)))
+    
+    38. X     = x.23^(x.24*x.25*inv(x.26))
+        y     = (x.31*inv((x.24*x.32)))
+        z     = x.23^(x.25*x.31*inv((x.26*x.32)))
+        z.1   = 'd'^(x.31*inv((x.24*x.32)))
+    
+    39. X     = x.23^(x.24*x.25*inv((x.26*x.27)))
+        y     = (x.26*x.32*inv(x.24))
+        z     = x.23^(x.25*x.32*inv(x.27))
+        z.1   = 'd'^(x.26*x.32*inv(x.24))
+    
+    40. X     = x.23^(x.24*x.25*inv((x.26*x.27)))
+        y     = (x.26*inv((x.24*x.32)))
+        z     = x.23^(x.25*inv((x.27*x.32)))
+        z.1   = 'd'^(x.26*inv((x.24*x.32)))
+    
+    41. X     = x.23^(x.24*inv((x.25*x.26)))
+        y     = (x.25*x.31*inv(x.32))
+        z     = x.23^(x.24*x.31*inv((x.26*x.32)))
+        z.1   = 'd'^(x.25*x.31*inv(x.32))
+    
+    42. X     = x.23^(x.24*inv((x.25*x.26)))
+        y     = (x.25*x.31*inv((x.24*x.32)))
+        z     = x.23^(x.31*inv((x.26*x.32)))
+        z.1   = 'd'^(x.25*x.31*inv((x.24*x.32)))
+    
+    43. X     = x.24^(x.25*x.26*inv((x.27*x.28)))
+        y     = (x.27*x.33*inv((x.25*x.34)))
+        z     = x.24^(x.26*x.33*inv((x.28*x.34)))
+        z.1   = 'd'^(x.27*x.33*inv((x.25*x.34)))
+    
+    44. X     = x.30^x.31
+        y     = y.20
+        z     = x.30^(y.20*x.31)
+        z.1   = 'd'^y.20
+    
+    45. X     = x.30^(x.31*inv(y.20))
+        y     = y.20
+        z     = x.30^x.31
+        z.1   = 'd'^y.20
+    
+    46. X     = x.31^inv((y.21*x.33))
+        y     = y.21
+        z     = x.31^inv(x.33)
+        z.1   = 'd'^y.21
+    
+    47. X     = x.32^(x.33*inv((y.22*x.35)))
+        y     = y.22
+        z     = x.32^(x.33*inv(x.35))
+        z.1   = 'd'^y.22
+  */
+
+rule (modulo E) A_4_receive:
+   [ St_A_4( A, id, B, kAB, p, x, s, Y ), In( mac(h(Y^x), 'd'^x) ) ]
+  --[
+  Recv( A, B, mac(h(Y^x), 'd'^x) ),
+  Commit( A, B, <'I', 'R', 'd'^x, Y> ), Secret( A, h(Y^x) ),
+  Honest( A ), Honest( B ), Finish( A )
+  ]->
+   [ St_A_5( A, id, B, kAB, p, x, s, Y ) ]
+
+  /*
+  rule (modulo AC) A_4_receive:
+     [ St_A_4( A, id, B, kAB, p, x, s, Y ), In( mac(h(z), z.1) ) ]
+    --[
+    Recv( A, B, mac(h(z), z.1) ), Commit( A, B, <'I', 'R', z.1, Y> ),
+    Secret( A, h(z) ), Honest( A ), Honest( B ), Finish( A )
+    ]->
+     [ St_A_5( A, id, B, kAB, p, x, s, Y ) ]
+    variants (modulo AC)
+     1. Y     = Y.12
+        x     = one
+        z     = Y.12
+        z.1   = 'd'
+    
+     2. Y     = Y.17
+        x     = x.22
+        z     = Y.17^x.22
+        z.1   = 'd'^x.22
+    
+     3. Y     = x.14^(x.15*x.16)
+        x     = inv(x.15)
+        z     = x.14^x.16
+        z.1   = 'd'^inv(x.15)
+    
+     4. Y     = z.14^inv(x.13)
+        x     = x.13
+        z     = z.14
+        z.1   = 'd'^x.13
+    
+     5. Y     = x.15^(x.16*x.17*inv(x.18))
+        x     = (x.18*inv(x.16))
+        z     = x.15^x.17
+        z.1   = 'd'^(x.18*inv(x.16))
+    
+     6. Y     = x.15^(x.16*inv((x.17*x.18)))
+        x     = (x.17*inv(x.16))
+        z     = x.15^inv(x.18)
+        z.1   = 'd'^(x.17*inv(x.16))
+    
+     7. Y     = x.16^(x.17*x.18*inv((x.19*x.20)))
+        x     = (x.19*inv(x.17))
+        z     = x.16^(x.18*inv(x.20))
+        z.1   = 'd'^(x.19*inv(x.17))
+    
+     8. Y     = z.17^x.24
+        x     = inv(x.24)
+        z     = z.17
+        z.1   = 'd'^inv(x.24)
+    
+     9. Y     = x.18^x.19
+        x     = inv((x.19*x.24))
+        z     = x.18^inv(x.24)
+        z.1   = 'd'^inv((x.19*x.24))
+    
+    10. Y     = x.18^x.19
+        x     = (x.24*inv(x.19))
+        z     = x.18^x.24
+        z.1   = 'd'^(x.24*inv(x.19))
+    
+    11. Y     = x.18^inv(x.19)
+        x     = inv(x.24)
+        z     = x.18^inv((x.19*x.24))
+        z.1   = 'd'^inv(x.24)
+    
+    12. Y     = x.18^inv(x.19)
+        x     = (x.19*x.24)
+        z     = x.18^x.24
+        z.1   = 'd'^(x.19*x.24)
+    
+    13. Y     = z.18^(x.25*inv(x.26))
+        x     = (x.26*inv(x.25))
+        z     = z.18
+        z.1   = 'd'^(x.26*inv(x.25))
+    
+    14. Y     = x.19^x.20
+        x     = (x.25*inv((x.20*x.26)))
+        z     = x.19^(x.25*inv(x.26))
+        z.1   = 'd'^(x.25*inv((x.20*x.26)))
+    
+    15. Y     = x.19^inv(x.20)
+        x     = (x.25*inv(x.26))
+        z     = x.19^(x.25*inv((x.20*x.26)))
+        z.1   = 'd'^(x.25*inv(x.26))
+    
+    16. Y     = x.19^inv((x.20*x.21))
+        x     = (x.20*x.26)
+        z     = x.19^(x.26*inv(x.21))
+        z.1   = 'd'^(x.20*x.26)
+    
+    17. Y     = x.19^inv((x.20*x.21))
+        x     = (x.20*inv(x.26))
+        z     = x.19^inv((x.21*x.26))
+        z.1   = 'd'^(x.20*inv(x.26))
+    
+    18. Y     = x.19^(x.20*x.21)
+        x     = inv((x.20*x.26))
+        z     = x.19^(x.21*inv(x.26))
+        z.1   = 'd'^inv((x.20*x.26))
+    
+    19. Y     = x.19^(x.20*x.21)
+        x     = (x.26*inv(x.20))
+        z     = x.19^(x.21*x.26)
+        z.1   = 'd'^(x.26*inv(x.20))
+    
+    20. Y     = x.19^(x.20*inv(x.21))
+        x     = inv(x.26)
+        z     = x.19^(x.20*inv((x.21*x.26)))
+        z.1   = 'd'^inv(x.26)
+    
+    21. Y     = x.19^(x.20*inv(x.21))
+        x     = inv((x.20*x.26))
+        z     = x.19^inv((x.21*x.26))
+        z.1   = 'd'^inv((x.20*x.26))
+    
+    22. Y     = x.19^(x.20*inv(x.21))
+        x     = (x.21*x.26)
+        z     = x.19^(x.20*x.26)
+        z.1   = 'd'^(x.21*x.26)
+    
+    23. Y     = x.19^(x.20*inv(x.21))
+        x     = (x.21*x.26*inv(x.20))
+        z     = x.19^x.26
+        z.1   = 'd'^(x.21*x.26*inv(x.20))
+    
+    24. Y     = x.19^(x.20*inv(x.21))
+        x     = (x.21*inv((x.20*x.26)))
+        z     = x.19^inv(x.26)
+        z.1   = 'd'^(x.21*inv((x.20*x.26)))
+    
+    25. Y     = x.20^inv((x.21*x.22))
+        x     = (x.21*x.27*inv(x.28))
+        z     = x.20^(x.27*inv((x.22*x.28)))
+        z.1   = 'd'^(x.21*x.27*inv(x.28))
+    
+    26. Y     = x.20^(x.21*x.22)
+        x     = (x.27*inv((x.21*x.28)))
+        z     = x.20^(x.22*x.27*inv(x.28))
+        z.1   = 'd'^(x.27*inv((x.21*x.28)))
+    
+    27. Y     = x.20^(x.21*x.22*inv(x.23))
+        x     = inv((x.21*x.28))
+        z     = x.20^(x.22*inv((x.23*x.28)))
+        z.1   = 'd'^inv((x.21*x.28))
+    
+    28. Y     = x.20^(x.21*x.22*inv(x.23))
+        x     = (x.23*x.28*inv(x.21))
+        z     = x.20^(x.22*x.28)
+        z.1   = 'd'^(x.23*x.28*inv(x.21))
+    
+    29. Y     = x.20^(x.21*x.22*inv(x.23))
+        x     = (x.23*inv((x.21*x.28)))
+        z     = x.20^(x.22*inv(x.28))
+        z.1   = 'd'^(x.23*inv((x.21*x.28)))
+    
+    30. Y     = x.20^(x.21*inv(x.22))
+        x     = (x.22*x.27*inv((x.21*x.28)))
+        z     = x.20^(x.27*inv(x.28))
+        z.1   = 'd'^(x.22*x.27*inv((x.21*x.28)))
+    
+    31. Y     = x.20^(x.21*inv(x.22))
+        x     = (x.27*inv(x.28))
+        z     = x.20^(x.21*x.27*inv((x.22*x.28)))
+        z.1   = 'd'^(x.27*inv(x.28))
+    
+    32. Y     = x.20^(x.21*inv(x.22))
+        x     = (x.27*inv((x.21*x.28)))
+        z     = x.20^(x.27*inv((x.22*x.28)))
+        z.1   = 'd'^(x.27*inv((x.21*x.28)))
+    
+    33. Y     = x.20^(x.21*inv((x.22*x.23)))
+        x     = (x.22*x.28)
+        z     = x.20^(x.21*x.28*inv(x.23))
+        z.1   = 'd'^(x.22*x.28)
+    
+    34. Y     = x.20^(x.21*inv((x.22*x.23)))
+        x     = (x.22*x.28*inv(x.21))
+        z     = x.20^(x.28*inv(x.23))
+        z.1   = 'd'^(x.22*x.28*inv(x.21))
+    
+    35. Y     = x.20^(x.21*inv((x.22*x.23)))
+        x     = (x.22*inv(x.28))
+        z     = x.20^(x.21*inv((x.23*x.28)))
+        z.1   = 'd'^(x.22*inv(x.28))
+    
+    36. Y     = x.20^(x.21*inv((x.22*x.23)))
+        x     = (x.22*inv((x.21*x.28)))
+        z     = x.20^inv((x.23*x.28))
+        z.1   = 'd'^(x.22*inv((x.21*x.28)))
+    
+    37. Y     = x.21^(x.22*x.23*inv(x.24))
+        x     = (x.24*x.29*inv((x.22*x.30)))
+        z     = x.21^(x.23*x.29*inv(x.30))
+        z.1   = 'd'^(x.24*x.29*inv((x.22*x.30)))
+    
+    38. Y     = x.21^(x.22*x.23*inv(x.24))
+        x     = (x.29*inv((x.22*x.30)))
+        z     = x.21^(x.23*x.29*inv((x.24*x.30)))
+        z.1   = 'd'^(x.29*inv((x.22*x.30)))
+    
+    39. Y     = x.21^(x.22*x.23*inv((x.24*x.25)))
+        x     = (x.24*x.30*inv(x.22))
+        z     = x.21^(x.23*x.30*inv(x.25))
+        z.1   = 'd'^(x.24*x.30*inv(x.22))
+    
+    40. Y     = x.21^(x.22*x.23*inv((x.24*x.25)))
+        x     = (x.24*inv((x.22*x.30)))
+        z     = x.21^(x.23*inv((x.25*x.30)))
+        z.1   = 'd'^(x.24*inv((x.22*x.30)))
+    
+    41. Y     = x.21^(x.22*inv((x.23*x.24)))
+        x     = (x.23*x.29*inv(x.30))
+        z     = x.21^(x.22*x.29*inv((x.24*x.30)))
+        z.1   = 'd'^(x.23*x.29*inv(x.30))
+    
+    42. Y     = x.21^(x.22*inv((x.23*x.24)))
+        x     = (x.23*x.29*inv((x.22*x.30)))
+        z     = x.21^(x.29*inv((x.24*x.30)))
+        z.1   = 'd'^(x.23*x.29*inv((x.22*x.30)))
+    
+    43. Y     = x.22^(x.23*x.24*inv((x.25*x.26)))
+        x     = (x.25*x.31*inv((x.23*x.32)))
+        z     = x.22^(x.24*x.31*inv((x.26*x.32)))
+        z.1   = 'd'^(x.25*x.31*inv((x.23*x.32)))
+    
+    44. Y     = x.26^x.27
+        x     = x.18
+        z     = x.26^(x.18*x.27)
+        z.1   = 'd'^x.18
+    
+    45. Y     = x.26^(x.27*inv(x.18))
+        x     = x.18
+        z     = x.26^x.27
+        z.1   = 'd'^x.18
+    
+    46. Y     = x.27^inv((x.19*x.29))
+        x     = x.19
+        z     = x.27^inv(x.29)
+        z.1   = 'd'^x.19
+    
+    47. Y     = x.28^(x.29*inv((x.20*x.31)))
+        x     = x.20
+        z     = x.28^(x.29*inv(x.31))
+        z.1   = 'd'^x.20
+  */
+
+restriction Inequality:
+  "∀ x #i. (Neq( x, x ) @ #i) ⇒ (⊥)"
+  // safety formula
+
+lemma executable:
+  exists-trace
+  "∃ A B #i #j.
+    (((((Finish( A ) @ #i) ∧ (Finish( B ) @ #j)) ∧
+       (∀ Name1 Id1 Name2 Id2 #i.1 #j.1.
+         ((Create_A( Name1, Id1, 'roleA' ) @ #i.1) ∧
+          (Create_A( Name2, Id2, 'roleA' ) @ #j.1)) ⇒
+         (#i.1 = #j.1))) ∧
+      (∀ Name1 Id1 Name2 Id2 #i.1 #j.1.
+        ((Create_B( Name1, Id1, 'roleB' ) @ #i.1) ∧
+         (Create_B( Name2, Id2, 'roleB' ) @ #j.1)) ⇒
+        (#i.1 = #j.1))) ∧
+     (¬(A = B))) ∧
+    (¬(∃ X #k. Rev( X ) @ #k))"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ A B #i #j.
+  (Finish( A ) @ #i) ∧ (Finish( B ) @ #j)
+ ∧
+  (∀ Name1 Id1 Name2 Id2 #i.1 #j.1.
+    (Create_A( Name1, Id1, 'roleA' ) @ #i.1) ∧
+    (Create_A( Name2, Id2, 'roleA' ) @ #j.1)
+   ⇒
+    #i.1 = #j.1) ∧
+  (∀ Name1 Id1 Name2 Id2 #i.1 #j.1.
+    (Create_B( Name1, Id1, 'roleB' ) @ #i.1) ∧
+    (Create_B( Name2, Id2, 'roleB' ) @ #j.1)
+   ⇒
+    #i.1 = #j.1) ∧
+  (¬(A = B)) ∧
+  (∀ X #k. (Rev( X ) @ #k) ⇒ ⊥)"
+*/
+simplify
+solve( Finish( A ) @ #i )
+  case A_4_receive
+  solve( St_A_4( A, id, B, kAB, p, x, s, Y ) ▶₀ #i )
+    case A_3_send
+    solve( Finish( B.1 ) @ #j )
+      case B_4_send
+      solve( St_B_4( B.1, id.1, A.1, kAB.1, X, p.1, s.1, y ) ▶₀ #j )
+        case B_3_receive
+        solve( !KU( mac(h(z), 'd'^~x) ) @ #vk )
+          case B_4_send
+          solve( !KU( senc(s.1, h(~kAB.1)) ) @ #vk.7 )
+            case A_1_send
+            solve( !KU( mac(h('d'^(~x*~y)), 'd'^~y) ) @ #vk.3 )
+              case A_3_send
+              solve( !KU( 'd'^~x ) @ #vk.6 )
+                case A_1_send
+                solve( !KU( 'd'^~y ) @ #vk.6 )
+                  case B_2_send
+                  SOLVED // trace found
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma injectiveAgreementInitiator:
+  all-traces
+  "∀ a b t #i.
+    (Commit( a, b, <'I', 'R', t> ) @ #i) ⇒
+    ((∃ #j.
+       (Running( b, a, <'I', 'R', t> ) @ #j) ∧
+       (¬(∃ a2 b2 #i2.
+           (Commit( a2, b2, <'I', 'R', t> ) @ #i2) ∧ (¬(#i2 = #i))))) ∨
+     (∃ X #r. Rev( X ) @ #r))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ a b t #i.
+  (Commit( a, b, <'I', 'R', t> ) @ #i)
+ ∧
+  (∀ #j.
+    (Running( b, a, <'I', 'R', t> ) @ #j)
+   ⇒
+    ∃ a2 b2 #i2.
+     (Commit( a2, b2, <'I', 'R', t> ) @ #i2) ∧ ¬(#i2 = #i)) ∧
+  (∀ X #r. (Rev( X ) @ #r) ⇒ ⊥)"
+*/
+simplify
+solve( Commit( a, b, <'I', 'R', t> ) @ #i )
+  case A_4_receive
+  solve( St_A_4( a, id, b, kAB, p, x, s, Y ) ▶₀ #i )
+    case A_3_send
+    solve( !KU( mac(h(z), 'd'^~x) ) @ #vk )
+      case A_3_send
+      solve( !KU( 'd'^~x ) @ #vk.2 )
+        case A_1_send
+        solve( !KU( 'd'^~x.1 ) @ #vk.2 )
+          case A_1_send
+          SOLVED // trace found
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma injectiveAgreementResponder:
+  all-traces
+  "∀ a b t #i.
+    (Commit( a, b, <'R', 'I', t> ) @ #i) ⇒
+    ((∃ #j.
+       (Running( b, a, <'R', 'I', t> ) @ #j) ∧
+       (¬(∃ a2 b2 #i2.
+           (Commit( a2, b2, <'R', 'I', t> ) @ #i2) ∧ (¬(#i2 = #i))))) ∨
+     (∃ X #r. Rev( X ) @ #r))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ a b t #i.
+  (Commit( a, b, <'R', 'I', t> ) @ #i)
+ ∧
+  (∀ #j.
+    (Running( b, a, <'R', 'I', t> ) @ #j)
+   ⇒
+    ∃ a2 b2 #i2.
+     (Commit( a2, b2, <'R', 'I', t> ) @ #i2) ∧ ¬(#i2 = #i)) ∧
+  (∀ X #r. (Rev( X ) @ #r) ⇒ ⊥)"
+*/
+simplify
+solve( Commit( a, b, <'R', 'I', t> ) @ #i )
+  case B_3_receive
+  solve( St_B_3( a, id, b, kAB, X, p, s, y ) ▶₀ #i )
+    case B_2_send
+    solve( !KU( mac(h(z), 'd'^~y) ) @ #vk )
+      case A_3_send
+      solve( !KU( senc(s, h(~kAB)) ) @ #vk.5 )
+        case A_1_send
+        solve( !KU( 'd'^~y ) @ #vk.6 )
+          case B_2_send
+          solve( !KU( 'd'^~x ) @ #vk.5 )
+            case A_1_send
+            SOLVED // trace found
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma secrecy:
+  all-traces
+  "∀ A x #i.
+    (Secret( A, x ) @ #i) ⇒
+    ((¬(∃ #j. K( x ) @ #j)) ∨
+     (∃ X #r. (Rev( X ) @ #r) ∧ (Honest( X ) @ #i)))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ A x #i.
+  (Secret( A, x ) @ #i)
+ ∧
+  (∃ #j. (K( x ) @ #j)) ∧
+  (∀ X #r. (Rev( X ) @ #r) ∧ (Honest( X ) @ #i) ⇒ ⊥)"
+*/
+simplify
+solve( Secret( A, x ) @ #i )
+  case A_4_receive
+  solve( St_A_4( A, id, B, kAB, p, x, s, Y ) ▶₀ #i )
+    case A_3_send
+    solve( !KU( mac(h(z), 'd'^~x) ) @ #vk.1 )
+      case c_mac
+      solve( splitEqs(0) )
+        case split_case_1
+        solve( !KU( h(Y^~x) ) @ #vk.1 )
+          case c_h
+          solve( !KU( Y^~x ) @ #vk.4 )
+            case A_1_send
+            SOLVED // trace found
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma forward_secrecy:
+  all-traces
+  "∀ A x #i.
+    (Secret( A, x ) @ #i) ⇒
+    ((¬(∃ #j. K( x ) @ #j)) ∨
+     (∃ X #r. ((Rev( X ) @ #r) ∧ (Honest( X ) @ #i)) ∧ (#r < #i)))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ A x #i.
+  (Secret( A, x ) @ #i)
+ ∧
+  (∃ #j. (K( x ) @ #j)) ∧
+  (∀ X #r. (Rev( X ) @ #r) ∧ (Honest( X ) @ #i) ⇒ ¬(#r < #i))"
+*/
+simplify
+solve( Secret( A, x ) @ #i )
+  case A_4_receive
+  solve( St_A_4( A, id, B, kAB, p, x, s, Y ) ▶₀ #i )
+    case A_3_send
+    solve( !KU( mac(h(z), 'd'^~x) ) @ #vk.1 )
+      case c_mac
+      solve( splitEqs(0) )
+        case split_case_1
+        solve( !KU( h(Y^~x) ) @ #vk.1 )
+          case c_h
+          solve( !KU( Y^~x ) @ #vk.4 )
+            case A_1_send
+            SOLVED // trace found
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+/* All well-formedness checks were successful. */
+
+end
