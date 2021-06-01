@@ -1,0 +1,232 @@
+theory OTR2 begin
+
+// Function signature and definition of the equational theory E
+
+builtins: diffie-hellman
+functions: fst/1, pair/2, pk/1, sign/2, snd/1, true/0, verify/3
+equations:
+    fst(<x.1, x.2>) = x.1,
+    snd(<x.1, x.2>) = x.2,
+    verify(sign(x.1, x.2), x.1, pk(x.2)) = true
+
+
+
+rule (modulo E) Reg_ltk:
+   [ Fr( ~sk ) ]
+  --[ Reg( ~sk ) ]->
+   [ !Ltk( $A, ~sk ), !Pk( $A, pk(~sk) ), Out( pk(~sk) ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Reveal_ltk:
+   [ !Ltk( A, k ) ] --[ Rev( A ) ]-> [ Out( k ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Initialise_A:
+   [ Fr( ~id ), !Ltk( A, skA ), !Pk( B, pk(skB) ) ]
+  --[ Create_A( A, ~id, 'I' ) ]->
+   [ St_A_1( A, ~id, skA, B, pk(skB) ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Initialise_B:
+   [ Fr( ~id ), !Ltk( B, skB ), !Pk( A, pk(skA) ) ]
+  --[ Create_B( B, ~id, 'R' ) ]->
+   [ St_B_1( B, ~id, skB, A, pk(skA) ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) A_1_send:
+   [ Fr( ~x ), St_A_1( A, id, skA, B, pk(skB) ) ]
+  --[ Send_I_1( A, B, <'g'^~x, sign('g'^~x, skA), pk(skA)> ) ]->
+   [
+   St_A_2( A, id, skA, B, pk(skB), ~x ),
+   Out( <'g'^~x, sign('g'^~x, skA), pk(skA)> )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) B_1_receive:
+   [
+   St_B_1( B, id, skB, A, pk(skA) ), In( <X, sign(X, skA), pk(skA)> )
+   ]
+  --[ Recv_R_1( B, A, <X, sign(X, skA), pk(skA)> ) ]->
+   [ St_B_2( B, id, skB, A, pk(skA), X ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) B_2_send:
+   [ Fr( ~y ), St_B_2( B, id, skB, A, pk(skA), X ) ]
+  --[
+  Send_R_2( B, A, <'g'^~y, sign('g'^~y, skB), pk(skB)> ),
+  Running( B, A, <'I', 'R', 'g'^~y, pk(skB)> ), Honest( A ),
+  Honest( B ), Finish( B )
+  ]->
+   [
+   St_B_3( B, id, skB, A, pk(skA), ~y, X ),
+   Out( <'g'^~y, sign('g'^~y, skB), pk(skB)> )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) A_2_receive:
+   [
+   St_A_2( A, id, skA, B, pk(skB), x ),
+   In( <Y, sign(Y, skB), pk(skB)> )
+   ]
+  --[
+  Recv_I_2( A, B, <Y, sign(Y, skB), pk(skB)> ),
+  Commit( A, B, <'I', 'R', Y, pk(skB)> ), Honest( A ), Honest( B ),
+  Finish( A )
+  ]->
+   [ St_A_3( A, id, skA, B, pk(skB), x, Y ) ]
+
+  /* has exactly the trivial AC variant */
+
+lemma executable:
+  exists-trace
+  "∃ A B msg #i #j #p #q.
+    (((((((Finish( A ) @ #i) ∧ (Finish( B ) @ #j)) ∧
+         (Recv_I_2( A, B, msg ) @ #p)) ∧
+        (Send_R_2( B, A, msg ) @ #q)) ∧
+       (∀ Name1 Id1 Name2 Id2 #i.1 #j.1.
+         ((Create_A( Name1, Id1, 'I' ) @ #i.1) ∧
+          (Create_A( Name2, Id2, 'I' ) @ #j.1)) ⇒
+         (#i.1 = #j.1))) ∧
+      (∀ Name1 Id1 Name2 Id2 #i.1 #j.1.
+        ((Create_B( Name1, Id1, 'R' ) @ #i.1) ∧
+         (Create_B( Name2, Id2, 'R' ) @ #j.1)) ⇒
+        (#i.1 = #j.1))) ∧
+     (¬(A = B))) ∧
+    (¬(∃ X #k. Rev( X ) @ #k))"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ A B msg #i #j #p #q.
+  (Finish( A ) @ #i) ∧
+  (Finish( B ) @ #j) ∧
+  (Recv_I_2( A, B, msg ) @ #p) ∧
+  (Send_R_2( B, A, msg ) @ #q)
+ ∧
+  (∀ Name1 Id1 Name2 Id2 #i.1 #j.1.
+    (Create_A( Name1, Id1, 'I' ) @ #i.1) ∧
+    (Create_A( Name2, Id2, 'I' ) @ #j.1)
+   ⇒
+    #i.1 = #j.1) ∧
+  (∀ Name1 Id1 Name2 Id2 #i.1 #j.1.
+    (Create_B( Name1, Id1, 'R' ) @ #i.1) ∧
+    (Create_B( Name2, Id2, 'R' ) @ #j.1)
+   ⇒
+    #i.1 = #j.1) ∧
+  (¬(A = B)) ∧
+  (∀ X #k. (Rev( X ) @ #k) ⇒ ⊥)"
+*/
+simplify
+solve( St_A_2( A, id, skA, B, pk(skB), x ) ▶₀ #p )
+  case A_1_send
+  solve( St_B_2( $A.1, id.1, ~sk.1, $A, pk(skA), X ) ▶₁ #q )
+    case B_1_receive
+    solve( Finish( $A ) @ #i )
+      case A_2_receive
+      solve( St_A_2( $A, id, skA, B, pk(skB), x ) ▶₀ #i )
+        case A_1_send
+        solve( Finish( $A.1 ) @ #j )
+          case B_2_send
+          solve( St_B_2( $A.1, id.1, skB, A.2, pk(skA), X ) ▶₁ #j )
+            case B_1_receive
+            solve( !KU( sign(X, ~sk.2) ) @ #vk.8 )
+              case A_1_send
+              solve( !KU( sign('g'^~y, ~sk.1) ) @ #vk.4 )
+                case B_2_send
+                solve( !KU( pk(~sk.1) ) @ #vk.7 )
+                  case B_2_send
+                  solve( !KU( 'g'^~y ) @ #vk.7 )
+                    case B_2_send
+                    solve( !KU( pk(~sk) ) @ #vk.9 )
+                      case A_1_send
+                      solve( !KU( 'g'^~x ) @ #vk.9 )
+                        case A_1_send
+                        SOLVED // trace found
+                      qed
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma NonInjectiveAgreementInitiator:
+  all-traces
+  "∀ A B t #i.
+    ((((Commit( A, B, <'I', 'R', t> ) @ #i) ∧
+       (∀ Name1 Id1 Name2 Id2 #i.1 #j.
+         ((Create_A( Name1, Id1, 'I' ) @ #i.1) ∧
+          (Create_A( Name2, Id2, 'I' ) @ #j)) ⇒
+         (#i.1 = #j))) ∧
+      (∀ Name1 Id1 Id2 #i.1 #j.
+        ((Create_B( Name1, Id1, 'R' ) @ #i.1) ∧
+         (Create_B( Name1, Id2, 'R' ) @ #j)) ⇒
+        (#i.1 = #j))) ∧
+     (¬(A = B))) ⇒
+    ((∃ #j. Running( B, A, <'I', 'R', t> ) @ #j) ∨
+     (∃ X #r. Rev( X ) @ #r))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ A B t #i.
+  (Commit( A, B, <'I', 'R', t> ) @ #i)
+ ∧
+  (∀ Name1 Id1 Name2 Id2 #i.1 #j.
+    (Create_A( Name1, Id1, 'I' ) @ #i.1) ∧
+    (Create_A( Name2, Id2, 'I' ) @ #j)
+   ⇒
+    #i.1 = #j) ∧
+  (∀ Name1 Id1 Id2 #i.1 #j.
+    (Create_B( Name1, Id1, 'R' ) @ #i.1) ∧
+    (Create_B( Name1, Id2, 'R' ) @ #j)
+   ⇒
+    #i.1 = #j) ∧
+  (¬(A = B)) ∧
+  (∀ #j. (Running( B, A, <'I', 'R', t> ) @ #j) ⇒ ⊥) ∧
+  (∀ X #r. (Rev( X ) @ #r) ⇒ ⊥)"
+*/
+simplify
+solve( St_A_2( A, id, skA, B, pk(skB), x ) ▶₀ #i )
+  case A_1_send
+  solve( !KU( sign(Y, ~sk.1) ) @ #vk.3 )
+    case B_2_send
+    solve( !KU( sign(X, ~sk.2) ) @ #vk.8 )
+      case B_2_send
+      solve( !KU( sign(X, ~sk.3) ) @ #vk.13 )
+        case A_1_send
+        solve( !KU( pk(~sk.1) ) @ #vk.8 )
+          case B_2_send
+          solve( !KU( pk(~sk.2) ) @ #vk.12 )
+            case B_2_send
+            solve( !KU( 'g'^~y ) @ #vk.11 )
+              case B_2_send
+              solve( !KU( pk(~sk) ) @ #vk.14 )
+                case A_1_send
+                solve( !KU( 'g'^~y.1 ) @ #vk.13 )
+                  case B_2_send
+                  solve( !KU( 'g'^~x ) @ #vk.14 )
+                    case A_1_send
+                    SOLVED // trace found
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+/* All well-formedness checks were successful. */
+
+end

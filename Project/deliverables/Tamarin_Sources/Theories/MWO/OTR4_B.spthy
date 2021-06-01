@@ -1,0 +1,177 @@
+theory OTR4_B
+begin
+
+builtins: signing, diffie-hellman, hashing
+
+functions: mac/2, extract/1
+
+equations: extract(sign{m}k) = m
+/*
+1. A -> B: g^x
+2. B -> A: g^y
+3. A -> B: A, sign{g^y, g^x}_sk(A), ['I',A]_h(g^xy), pk(A)
+4. B -> A: B, sign{g^x, g^y}_sk(B), ['R',B]_h(g^xy), pk(B)
+*/
+
+
+// Public key infrastructure
+
+rule Reg_ltk:
+  [ Fr(~sk) ]
+  -->
+  [ !Ltk($A, ~sk), !Pk($A, pk(~sk)), Out(pk(~sk)) ]
+
+rule Reveal_ltk:
+  [ !Ltk(A, k) ]
+  --[ Rev(A) ]->
+  [ Out(k) ]
+
+// Initalisation rules
+
+//Initialise A
+rule Initialise_A:
+  [ Fr(~id), !Ltk(A, skA), !Pk(B, pk(skB)) ]
+  --[ Create_A(A, ~id, 'I') ]->
+  [ St_A_1(A, ~id, skA, B, pk(skB)) ]
+
+//Initialise B
+rule Initialise_B:
+  [ Fr(~id), !Ltk(B, skB),!Pk(A, pk(skA))  ]
+  --[ Create_B(B, ~id, 'R') ]->
+  [ St_B_1(B, ~id, skB, A, pk(skA)) ]
+
+
+// Protocol
+
+//A sends g^x to B
+rule A_1_send:
+  [ Fr(~x)
+  , St_A_1(A, id, skA, B, pk(skB)) ]
+  --[ Send_I_1(A, B, 'g'^~x) ]->
+  [ St_A_2(A, id, skA, B, pk(skB), ~x), Out('g'^~x) ]
+
+//B receives X
+rule B_1_receive:
+  [ St_B_1(B, id, skB, A, pk(skA))
+  , In(X) ]
+  --[ Recv_R_1(B, A, X) ]->
+  [ St_B_2(B, id, skB, A, pk(skA), X) ]
+
+//B sends g^y to A
+rule B_2_send:
+  [ Fr(~y)
+  , St_B_2(B, id, skB, A, pk(skA), X) ]
+  --[ Send_R_2(B, A, 'g'^~y) ]->
+  [ St_B_3(B, id, skB, A, pk(skA), ~y, X), Out('g'^~y) ]
+
+//A receives Y
+rule A_2_receive:
+  [ St_A_2(A, id, skA, B, pk(skB), x)
+  , In(Y) ]
+  --[ Recv_I_2(A, B, Y) ]->
+  [ St_A_3(A, id, skA, B, pk(skB), x, Y) ]
+
+//A sends signed g^x and Y,  MAC of <'I', A> with the key h(g^xy) and A's verif. key
+rule A_3_send:
+  let msg = <A, sign{'I', Y, 'g'^x}skA, mac(h(Y^x), <'I', A>), pk(skA)> in
+  [ St_A_3(A, id, skA, B, pk(skB), x, Y) ]
+  --[ Send_I_3(A, B, msg)
+  , Running(A, B, <'R', 'I', Y^x>) ]->
+  [ St_A_4(A, id, skA, B, pk(skB), x, Y), Out(msg) ]
+
+//B receives message from A
+rule B_3_receive:
+  let msg = <A, sign{'I', 'g'^y, X}skA, mac(h(X^y), <'I', A>), pk(skA)> in
+  [ St_B_3(B, id, skB, A, pk(skA), y, X)
+  , In(msg) ]
+  --[ Recv_R_3(B, A, msg)
+  , Commit(B, A, <'R', 'I', X^y>) ]->
+  [ St_B_4(B, id, skB, A, pk(skA), y, X) ]
+
+//B sends signed X and g^y,  MAC of <'R', B> with the key h(g^xy) and B's verif. key
+rule B_4_send:
+  let msg = <B, sign{'R', X, 'g'^y}skB, mac(h(X^y), <'R', B>), pk(skB)> in
+  [ St_B_4(B, id, skB, A, pk(skA), y, X) ]
+  --[ Send_R_4(B, A, msg)
+  , Running(B, A, <'I', 'R', X^y>)
+  , Secret(B, X^y)
+  , Honest(A)
+  , Honest(B)
+  , Finish(B) ]->
+  [ St_B_5(B, id, skB, A, pk(skA), y, X), Out(msg) ]
+
+//A receives message from B
+rule A_4_receive:
+  let msg = <B, sign{'R', 'g'^x, Y}skB, mac(h(Y^x), <'R', B>), pk(skB)> in
+  [ St_A_4(A, id, skA, B, pk(skB), x, Y)
+  , In(msg) ]
+  --[ Recv_I_4(B, A, msg)
+  , Commit(A, B, <'I', 'R', Y^x>)
+  , Secret(A, Y^x)
+  , Honest(A)
+  , Honest(B)
+  , Finish(A) ]->
+  [ St_A_5(A, id, skA, B, pk(skB), x, Y) ]
+
+
+// Lemmas
+
+// succeeds
+lemma executable:
+  exists-trace
+    "Ex A B msg #i #j #p #q.
+       Finish(A)@i & Finish(B)@j
+       & Recv_R_1(B, A, msg)@p & Send_I_1(A, B, msg)@q
+       & (All Name1 Id1 Name2 Id2 #i #j. Create_A(Name1, Id1, 'I') @i & Create_A(Name2, Id2, 'I') @j ==> #i = #j)
+       & (All Name1 Id1 Name2 Id2 #i #j. Create_B(Name1, Id1, 'R') @i & Create_B(Name2, Id2, 'R') @j ==> #i = #j)
+       & not (A = B)
+       & not (Ex X #k. Rev(X)@k)
+    "
+
+lemma nonInjectiveAgreementInitiator:
+  "All a b t #i.
+    Commit(a, b, <'I','R',t>)@i
+    ==> (Ex #j. Running(b, a,<'I', 'R', t>)@j)
+    | (Ex X #r. Rev(X)@r & Honest(X)@i)"
+
+lemma InjectiveAgreementInitiator:
+    "All a b t #i.
+     Commit(a, b, <'I', 'R', t>)@i
+     ==> (Ex #j. Running(b, a,<'I', 'R', t>)@j
+     & not (Ex a2 b2 #i2. Commit(a2,b2,<'I','R',t>) @i2
+     & not (#i2 = #i)))
+          | (Ex X #r. Rev(X)@r & Honest(X) @i)"
+
+
+// fails
+lemma nonInjectiveAgreementResponder:
+     "All a b t #i.
+    Commit(a, b, <'R','I',t>)@i
+    ==> (Ex #j. Running(b, a,<'R', 'I', t>)@j)
+    | (Ex X #r. Rev(X)@r & Honest(X)@i)"
+
+lemma InjectiveAgreementResponder:
+    "All a b t #i.
+      Commit(a, b, <'R','I',t>)@i
+      ==> (Ex #j. Running(b, a,<'R', 'I', t>)@j
+              & not (Ex a2 b2 #i2. Commit(a2,b2,<'R','I',t>) @i2
+              & not (#i2 = #i)))
+          | (Ex X #r. Rev(X)@r & Honest(X) @i)"
+
+// succeeds
+
+lemma secrecy:
+    "All A x #i.
+      Secret(A, x) @i ==>
+      not (Ex #j. K(x)@j)
+          | (Ex X #r. Rev(X)@r & Honest(X) @i)"
+
+lemma forward_secrecy:
+    "All A x #i.
+      Secret(A, x) @i ==>
+      not (Ex #j. K(x)@j)
+          | (Ex X #r. Rev(X)@r & Honest(X) @i & r < i)"
+
+
+
+end
