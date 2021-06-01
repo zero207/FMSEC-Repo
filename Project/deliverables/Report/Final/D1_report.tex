@@ -74,7 +74,7 @@ The following simple challenge-response protocol was formalized in Tamarin:
 \end{align*}
 The MAC function was realised by an user-defined function with two parameters in Tamarin.  The details can be found in theory file \texttt{PACE\_1.spthy}.
 \subsection{Mutual authentication}
-The challenge-response protocol is extended in this subtask in that now it is not just Alice who sends a nonce $x$ to Bob.  Bob now also generates and sends a nonce $y$,  which is sent to Alice. The goal of the protocol is to reach an agreement between the two agents $A$ and $B$ with both nonces.
+The challenge-response protocol is extended in this subtask in that now it is not just Alice who sends a nonce $x$ to Bob.  Bob now also generates a nonce $y$,  which is sent to Alice. The goal of the protocol is to reach an agreement between the two agents $A$ and $B$ with both nonces.
 \begin{enumerate}[label=\alph*)]
 	\item Formally, the protocol now looks like this:
 \begin{align*}
@@ -85,7 +85,7 @@ The challenge-response protocol is extended in this subtask in that now it is no
 \end{align*}
 For the first revision of the protocol, we implemented two different protocol approaches. Firstly, we designed the protocol as described (i.e. \emph{A} sends \emph{x} to \emph{B} and \emph{B} sends \emph{y} to \emph{A}, etc), which can be found under \texttt{PACE\_2a.spthy}, and we noticed in the trace that these steps are happening in parallel. 
 
-We then implemented the protocol sequentially, i.e. \emph{B} must receive something from \emph{A} before sending something back. This variant can be found in the file \texttt{PACE\_2a\_seq.spthy}. And we use this variant to explain the trace shown in the non-injective agreement lemmas.
+We then implemented the protocol sequentially, i.e. \emph{B} must receive something from \emph{A} before sending something back. This variant can be found in the file \texttt{PACE\_2a\_seq.spthy}. And we use this variant to explain the trace shown in the non-injective agreement lemmas. \newline
 The problem in the protocol is that,  taking into account a Dolev-Yao intruder,  the non-injective agreement can be disproved here for both nonces $x$ and $y$ for both Alice and Bob. This is because neither Alice nor Bob can know for sure whether the message received was actually sent by the other or by an intruder.  Therefore, in this case,  a \textit{man-in-the-middle attack} can take place as shown in the non-injective agreement lemmas in \texttt{PACE\_2a\_seq.spthy}.  \newline
 Here, the \textit{man-in-the-middle} establishes communication with Alice and Bob.  Alice and Bob think they are communicating with each other and send their nonces to the intruder. The attacker can now send the nonce back 1:1 or even send back any nonce.  Alice and Bob now assume that they are communicating with each other,  as there is no identifier in the exchanged messages.  The returned nonce is now used to send the made message.  Thus,  the protocol can be carried out successfully without Alice or Bob noticing that they have not communicated with each other.
 
@@ -109,15 +109,16 @@ For the non-injective agreement responder lemma, the trace can be described as f
 \begin{align*}
 &\text{1.} \quad A \rightarrow B: x\\
 &\text{2.} \quad B \rightarrow A: y\\
-&\text{3.} \quad A \rightarrow B: [\tuple{'roleA', x, y}]_{k(b,a)}\\
-&\text{4.} \quad B \rightarrow A: [\tuple{'roleB', x, y}]_{k(a,b)}
+&\text{3.} \quad A \rightarrow B: [\tuple{'roleA', x, y}]_{k(B,A)}\\
+&\text{4.} \quad B \rightarrow A: [\tuple{'roleB', x, y}]_{k(A,B)}
 \end{align*}
 
-As before we have created a parallel protocol ( see theory file \texttt{PACE\_2b.spthy}) and a parallel protocol ( see theory file \texttt{PACE\_2b\_seq.spthy}).
+As before we have created a parallel protocol ( see theory file \texttt{PACE\_2b.spthy}) and a sequential protocol ( see theory file \texttt{PACE\_2b\_seq.spthy}).
 \end{enumerate}
 \subsection{Introducing a session key}
 \begin{enumerate}[label=\alph*)]
-	\item With the second refinement we can provide and hold mutual injective agreement on the nonces x and y and therefore on $\mathsf{Kab = kdf(k(A,B),x,y)}$. The refined protocol is defined like following:
+	\item In this refinement we replace both MAC keys $k(A,B)$ and $k(B,A)$ with a common key $\mathsf{Kab}$, which is derived from a low-entropy key $k(A,B)$ and both nonces $x$ and $y$.
+With this refinement we can provide and hold mutual injective agreement on the nonces x and y and therefore on $\mathsf{Kab = kdf(k(A,B),x,y)}$. The refined protocol is defined like following:
 	\begin{align*}
 	&\text{1. }\quad A \rightarrow B: x\\
 	&\text{2. }\quad B \rightarrow A: y\\
@@ -127,17 +128,18 @@ As before we have created a parallel protocol ( see theory file \texttt{PACE\_2b
 	\item In contrast to protocol \texttt{PACE\_2b}, the two nonces in \texttt{PACE\_3a} are not MACed, but instead used to generate $\mathsf{Kab}$.  $\mathsf{Kab}$ has the property that it cannot be manipulated or faked by the intruder. This ensures that the MACed message was only sent by a participant with the correct role. In this way,  protocol 	\texttt{PACE\_3a.spthy} ensures consistency across both nonces and roles.
 \end{enumerate}
 \subsection{Replace the password by a nonce}
-The refined protocol is very similar to the previous protocol. Only the low-entropy key $\mathsf{k(A,B)}$ is replaced by high-entropy nonce $s$.
+We refined the protocol as specified in the project assignment.
 	\begin{align*}
-	&\text{1. }\quad A \rightarrow B: x, \left\lbrace| s | \right\rbrace_{h(k(A,B)}\\
+	&\text{1. }\quad A \rightarrow B: x, \left\lbrace| s | \right\rbrace_{h(k(A,B))}\\
 	&\text{2. }\quad B \rightarrow A: y\\
 	&\text{3. }\quad A \rightarrow B: [\tuple{'roleA',  y}]_{kdf(s, x, y)}\\
 	&\text{4. }\quad B \rightarrow A: [\tuple{'roleB',  x}]_{kdf(s, x, y)}
 	\end{align*}
-	Compare with \texttt{PACE\_4.spthy} our parallel and \texttt{PACE\_4\_seq.spthy} our sequential solution.  All three security properties from the previous expansion stages are retained
+See \texttt{PACE\_4.spthy} for our parallel and \texttt{PACE\_4\_seq.spthy} for our sequential solution.  All three security properties from the previous refinement stages are retained.
 \subsection{Introducing Diffie-Hellman: The PACE protocol}
 \begin{enumerate}[label=\alph*)]
-	\item The nonces $x$ and $y$ were replaced by Diffie-Hellman keys $g^x$ and $g^y$. The refined protocol looks now like following:
+	\item The nonces $x$ and $y$ were replaced by Diffie-Hellman keys $g^x$ and $g^y$, the generator $g$ is derived from a mapping function using a public prime number $p$ and a nonce $s$.
+The refined protocol looks now like following:
 	  \begin{align*}
     		&\text{1. }\quad A \rightarrow B: g^x, p, \left\lbrace | s | \right\rbrace_{h(k(A,  B))}\\
 		&\text{2. }\quad B \rightarrow A: g^y\\
@@ -155,7 +157,9 @@ The refined protocol is very similar to the previous protocol. Only the low-entr
 		&Adv[B] \rightarrow A: [g^x]_{h(g^{xx})}
   	\end{align*}
 	By adding the restriction that $g^x$ and $g^y$ must be different,  the attack shown above cannot be made. \newline
-See \texttt{PACE\_5d.spthy}
+See \texttt{PACE\_5d.spthy}.
+
+But replacing the generator $g$ with a public value brings back the same attacks as with \texttt{PACE\_5ab_pubg.spthy},  see \texttt{PACE\_5d_pubg.spthy}.
 \end{enumerate}
 \newpage
 \section{The Off-the-Record Messaging Protocol}
@@ -183,13 +187,13 @@ A \leftarrow B : Sign_{sk_b(g^y)}, vk_B
 If the public key $vk_A$ is already stored by $B$ and it is associated with the identity of $A$ , this assures $B$ that $g^x$ comes from $A$ and vice versa (in the absence of pre-stored public keys the protocol could use PK certificates). After the verification of the signatures, both parties compute their shared secret value $g^{xy}$ and erase the DH exponents.
 \end{quote}
 In the protocol theory, we use the builtins "signing" and
-"diffie-hellman", which include the necessary functions and equations for the protocol. We then use the Key-generation rule to generate key-pairs $sk_x$ (signing key) and $pk_x$ (verification key). Then we use Initialisation rules to create the agents $A$ and $B$ so each agent knows its partner's pk ($A$ know $pk_B$ and $B$ knows $pk_A$) from beginning on (as specified in the above description).
+"diffie-hellman", which include the necessary functions and equations for the protocol. We then use the Key-generation rule to generate key-pairs $sk_x$ (signing key) and $pk_x$ (verification key). Then we use Initialisation rules to create the agents $A$ and $B$ so each agent knows its partner's verification key ($A$ know $pk_B$ and $B$ knows $pk_A$) from beginning on (as specified in the above description).
 \newline
 We then implement the protocol as follows:
 \[ \text{1.} \quad A \rightarrow B: g^x, sign\{g^x\}_{sk(A)}, pk(A) \]
 \[ \text{2.} \quad B \rightarrow A: g^y, sign\{g^y\}_{sk(B)}, pk(B) \]
 Where $g$ is a fixed constant to represent the generator, $x$ and $y$ are fresh values for the ephemeral keys and
-$ sk(x)$ and $pk(x)$ are the key-pairs generated for each agent.
+$ sk(\bullet)$ and $pk(\bullet)$ are the key-pairs generated for each agent.
 \newline
 In order to model the executable lemma, we add \emph{Finish} statements at the end of the protocol for each agent; we also make sure that a message received by $A$ corresponds to a message sent by B, that only one agent $A$ and one agent $B$ are created and finally that agent $A$ and agent $B$ are different.
 \newline
