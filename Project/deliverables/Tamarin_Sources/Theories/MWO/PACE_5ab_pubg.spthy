@@ -141,6 +141,7 @@ lemma executable:
        & not (Ex X #k. Rev(X)@k)
     "
 
+// fails
 lemma injectiveAgreementInitiator:
   "All a b t #i.
     Commit(a, b, <'I','R',t>)@i
